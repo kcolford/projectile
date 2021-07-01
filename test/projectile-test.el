@@ -162,12 +162,62 @@ Just delegates OPERATION and ARGS for all operations except for`shell-command`'.
     (expect (projectile-expand-root "foo/bar") :to-equal "/path/to/project/foo/bar")
     (expect (projectile-expand-root "./foo/bar") :to-equal "/path/to/project/foo/bar")))
 
+(describe "projectile--combine-plists"
+ (it "Items in second plist override elements in first"
+   (expect (projectile--combine-plists
+            '(:foo "foo" :bar "bar")
+            '(:foo "foo" :bar "foo" :foobar "foobar"))
+           :to-equal
+           '(:foo "foo" :bar "foo" :foobar "foobar")))
+ (it "Nil elements in second plist do not override elements in first"
+   (expect (projectile--combine-plists
+            '(:foo "foo" :bar "bar")
+            '(:foo "foo" :bar nil :foobar "foobar"))
+           :to-equal
+           '(:foo "foo" :bar "bar" :foobar "foobar"))))
+
 (describe "projectile-register-project-type"
   (it "prepends new projects to projectile-project-types"
     (projectile-register-project-type 'foo '("Foo"))
     (expect (caar projectile-project-types) :to-equal 'foo)
     (projectile-register-project-type 'bar '("Bar"))
     (expect (caar projectile-project-types) :to-equal 'bar)))
+
+(describe "projectile-update-project-type"
+  :var ((mock-projectile-project-types
+           '((foo marker-files "marker-file"
+                  project-file "project-file"
+                  compilation-dir "compilation-dir"
+                  configure-command "configure"
+                  compile-command "compile"
+                  test-command "test"
+                  install-command "install"
+                  package-command "package"
+                  run-command "run"))))
+  (it "Updates existing project in projectile-project-types"
+    (let ((projectile-project-types mock-projectile-project-types))
+      (projectile-update-project-type
+       'foo
+       :marker-files "marker-file2"
+       :test-suffix "suffix")
+      (expect projectile-project-types :to-equal
+              '((foo marker-files "marker-file2"
+                     project-file "project-file"
+                     compilation-dir "compilation-dir"
+                     configure-command "configure"
+                     compile-command "compile"
+                     test-command "test"
+                     install-command "install"
+                     package-command "package"
+                     run-command "run"
+                     test-suffix "suffix")))))
+  (it "Error when attempt to update nonexistant project type"
+    (let ((projectile-project-types mock-projectile-project-types))
+      (expect (projectile-update-project-type
+               'bar
+               :marker-files "marker-file"
+               :test-suffix "suffix")
+              :to-throw))))
 
 (describe "projectile-project-type"
   (it "detects the type of Projectile's project"
@@ -1162,7 +1212,37 @@ Just delegates OPERATION and ARGS for all operations except for`shell-command`'.
         (expect (projectile-test-file-p "src/Foo.cpp") :to-equal nil)
         (expect (projectile--find-matching-test "src/Foo.cpp") :to-equal '("test/Foo.cpp"))
         (expect (projectile--find-matching-test "src/Foo.cpp") :to-equal '("test/Foo.cpp"))
-        (expect (projectile--find-matching-file "test/Foo.cpp") :to-equal '("src/Foo.cpp"))))))
+        (expect (projectile--find-matching-file "test/Foo.cpp") :to-equal '("src/Foo.cpp")))))
+
+  (it "defers to test-dir property when it's set to a function"
+    (projectile-test-with-sandbox
+     (projectile-test-with-files-using-custom-project
+          ("src/foo/Foo.cpp"
+           "src/bar/Foo.cpp"
+           "test/foo/FooTest.cpp")
+          (:test-dir
+           (lambda (file-path)
+             (projectile-complementary-dir file-path "src" "test"))
+           :test-suffix "Test")
+          (expect (projectile--find-matching-test
+                   (projectile-expand-root "src/bar/Foo.cpp"))
+                  :to-equal
+                  (list "test/bar/FooTest.cpp")))))
+
+  (it "defers to src-dir property when it's set to a function"
+    (projectile-test-with-sandbox
+     (projectile-test-with-files-using-custom-project
+          ("src/foo/Foo.cpp"
+           "src/bar/Foo.cpp"
+           "test/foo/FooTest.cpp")
+          (:src-dir
+           (lambda (file-path)
+             (projectile-complementary-dir file-path "test" "src"))
+           :test-suffix "Test")
+          (expect (projectile--find-matching-file
+                   (projectile-expand-root "test/foo/FooTest.cpp"))
+                  :to-equal
+                  (list "src/foo/Foo.cpp"))))))
 
 (describe "projectile--related-files"
   (it "returns related files for the given file"
@@ -1459,6 +1539,14 @@ Just delegates OPERATION and ARGS for all operations except for`shell-command`'.
       (projectile-clear-known-projects)
       (expect projectile-known-projects :to-equal nil))))
 
+(describe "projectile-reset-known-projects"
+  (it "resets known projects"
+    (spy-on 'projectile-clear-known-projects)
+    (spy-on 'projectile-discover-projects-in-search-path)
+    (projectile-reset-known-projects)
+    (expect 'projectile-clear-known-projects :to-have-been-called)
+    (expect 'projectile-discover-projects-in-search-path :to-have-been-called)))
+
 (describe "projectile-test-ignored-directory-p"
   (it "ignores specified literal directory values"
     (spy-on 'projectile-ignored-directories :and-return-value '("/path/to/project/tmp"))
@@ -1598,6 +1686,168 @@ projectile-process-current-project-buffers-current to have similar behaviour"
         (projectile-process-current-project-buffers (lambda (b) (push b list-a)))
         (projectile-process-current-project-buffers-current (lambda () (push (current-buffer) list-b)))
         (expect list-a :to-equal list-b))))))
+
+(describe "projectile--impl-name-for-test-name"
+  :var ((mock-projectile-project-types
+         '((foo test-suffix "Test")
+           (bar test-prefix "Test"))))
+  (it "removes suffix from test file"
+    (cl-letf (((symbol-function 'projectile-project-type) (lambda () 'foo))
+              (projectile-project-types mock-projectile-project-types))
+      (expect (projectile--impl-name-for-test-name "FooTest.cpp")
+              :to-equal
+              "Foo.cpp")))
+  (it "removes prefix from test file"
+    (cl-letf (((symbol-function 'projectile-project-type) (lambda () 'bar))
+              (projectile-project-types mock-projectile-project-types))
+      (expect (projectile--impl-name-for-test-name "TestFoo.cpp")
+              :to-equal
+              "Foo.cpp"))))
+
+(describe "projectile-find-implementation-or-test"
+  (it "error when test file does not exist and projectile-create-missing-test-files is nil"
+    (cl-letf (((symbol-function 'projectile-test-file-p) #'ignore)
+              ((symbol-function 'file-exists-p) #'ignore)
+              ((symbol-function 'projectile-expand-root) #'identity)
+              ((symbol-function 'projectile-find-matching-test) (lambda (file) "dir/foo"))
+              (projectile-create-missing-test-files nil))
+      (expect (projectile-find-implementation-or-test "foo") :to-throw))))
+
+(describe "projectile--impl-file-from-src-dir-fn"
+  :var ((mock-projectile-project-types
+         '((foo src-dir (lambda (impl-file) "/outer/foo/test/dir"))
+           (bar src-dir "not a function"))))
+  (it "returns result of projectile--complementary-file when src-dir property is a function"
+    (cl-letf (((symbol-function 'projectile--complementary-file)
+               (lambda (impl-file dir-fn file-fn) (funcall dir-fn impl-file)))
+              ((symbol-function 'projectile-project-type) (lambda () 'foo))
+              ((symbol-function 'projectile-project-root) (lambda () "foo"))
+              ((symbol-function 'file-relative-name) (lambda (f rel) f))
+              ((symbol-function 'file-exists-p) (lambda (file) t))
+              (projectile-project-types mock-projectile-project-types))
+      (expect (projectile--impl-file-from-src-dir-fn "foo") :to-equal "/outer/foo/test/dir")))
+  (it "returns file relative to project root"
+    (cl-letf (((symbol-function 'projectile--complementary-file)
+               (lambda (impl-file dir-fn file-fn) (funcall dir-fn impl-file)))
+              ((symbol-function 'projectile-project-type) (lambda () 'foo))
+              ((symbol-function 'projectile-project-root) (lambda () "/outer/foo"))
+              ((symbol-function 'file-exists-p) (lambda (file) t))
+              (projectile-project-types mock-projectile-project-types))
+      (expect (projectile--impl-file-from-src-dir-fn "/outer/foo/bar")
+              :to-equal
+              "test/dir")))
+  (it "returns nil when src-dir property is a not function"
+    (cl-letf (((symbol-function 'projectile-project-type) (lambda () 'bar))
+              ((symbol-function 'projectile-project-root) (lambda () "foo"))
+              (projectile-project-types mock-projectile-project-types))
+      (expect (projectile--impl-file-from-src-dir-fn "bar") :to-equal nil)))
+  (it "returns nil when src-dir function result is not an existing file"
+    (cl-letf (((symbol-function 'projectile--complementary-file)
+               (lambda (impl-file dir-fn file-fn) (funcall dir-fn impl-file)))
+              ((symbol-function 'projectile-project-type) (lambda () 'foo))
+              ((symbol-function 'projectile-project-root) (lambda () "/outer/foo"))
+              ((symbol-function 'file-exists-p) #'ignore)
+              (projectile-project-types mock-projectile-project-types))
+      (expect (projectile--impl-file-from-src-dir-fn "bar") :to-equal nil))))
+
+(describe "projectile--test-file-from-test-dir-fn"
+  :var ((mock-projectile-project-types
+         '((foo test-dir (lambda (impl-file) "/outer/foo/test/dir"))
+           (bar test-dir "not a function"))))
+  (it "returns result of projectile--complementary-file when test-dir property is a function"
+    (cl-letf (((symbol-function 'projectile--complementary-file)
+               (lambda (impl-file dir-fn file-fn) (funcall dir-fn impl-file)))
+              ((symbol-function 'projectile-project-type) (lambda () 'foo))
+              ((symbol-function 'projectile-project-root) (lambda () "foo"))
+              ((symbol-function 'file-relative-name) (lambda (f rel) f))
+              (projectile-project-types mock-projectile-project-types))
+      (expect (projectile--test-file-from-test-dir-fn "foo") :to-equal "/outer/foo/test/dir")))
+  (it "returns file relative to project root"
+    (cl-letf (((symbol-function 'projectile-project-type) (lambda () 'foo))
+              ((symbol-function 'projectile-project-root) (lambda () "/outer/foo"))
+              ((symbol-function 'projectile--complementary-file)
+               (lambda (impl-file dir-fn file-fn) (funcall dir-fn impl-file)))
+              (projectile-project-types mock-projectile-project-types))
+      (expect (projectile--test-file-from-test-dir-fn "/outer/foo/bar")
+              :to-equal
+              "test/dir")))
+  (it "returns nil when test-dir property is a not function"
+    (cl-letf (((symbol-function 'projectile-project-type) (lambda () 'bar))
+              (projectile-project-types mock-projectile-project-types)
+              ((symbol-function 'projectile-project-root) (lambda () "foo")))
+      (expect (projectile--test-file-from-test-dir-fn "bar") :to-equal nil))))
+
+(describe "projectile--complementary-file"
+  (it "dir-fn and filename-fn applied correctly"
+    (cl-letf (((symbol-function 'file-exists-p) (lambda (file) t))
+              ((symbol-function 'dir-fn) (lambda (dir) "foo/test/dir"))
+              ((symbol-function 'filename-fn) (lambda (filename) "Foo.test")))
+      (expect (projectile--complementary-file
+               "foo/src/dir/Foo.impl"
+               #'dir-fn
+               #'filename-fn)
+              :to-equal "foo/test/dir/Foo.test"))))
+
+(describe "projectile--impl-to-test-dir"
+    :var ((mock-projectile-project-types
+           '((foo test-dir "test" src-dir "src")
+             (bar test-dir identity src-dir "src"))))
+    (it "replaces occurrences of src-dir with test-dir"
+      (cl-letf (((symbol-function 'projectile-project-root) (lambda () "foo"))
+                ((symbol-function 'projectile-project-type) (lambda () 'foo))
+                (projectile-project-types mock-projectile-project-types))
+        (expect (projectile--impl-to-test-dir "/foo/src/Foo") :to-equal "/foo/test/")))
+    (it "error signalled when test dir property is not a string"
+      (cl-letf (((symbol-function 'projectile-project-root) (lambda () "bar"))
+                ((symbol-function 'projectile-project-type) (lambda () 'bar))
+                (projectile-project-types mock-projectile-project-types))
+        (expect (projectile--impl-to-test-dir "/bar/src/bar") :to-throw))))
+
+(describe "projectile-run-shell-command-in-root"
+  (describe "when called directly in elisp"
+    (before-each (spy-on 'shell-command))
+    (describe "when called with all three paramters"
+      (it "expects to call shell-command with the same parameters"
+        (projectile-run-shell-command-in-root "cmd" "output-buffer" "error-buffer")
+        (expect 'shell-command :to-have-been-called-with "cmd" "output-buffer" "error-buffer")))
+    (describe "when called with only one optional paramter"
+      (it "expects to call shell-command with the same parameters"
+        (projectile-run-shell-command-in-root "cmd" "output-buffer")
+        (expect 'shell-command :to-have-been-called-with "cmd" "output-buffer" nil)))
+    (describe "when called with no optional paramters"
+      (it "expects to call shell-command with the same parameters"
+        (projectile-run-shell-command-in-root "cmd")
+        (expect 'shell-command :to-have-been-called-with "cmd" nil nil))))
+  (describe "when called interactively"
+    (before-each (spy-on 'shell-command))
+    (it "expects to be interactive"
+      (expect (interactive-form 'projectile-run-shell-command-in-root) :not :to-be nil))
+    (it "expects to call shell-command with the given command"
+      (funcall-interactively 'projectile-run-shell-command-in-root "cmd")
+      (expect 'shell-command :to-have-been-called-with "cmd" nil nil))))
+
+(describe "projectile-run-async-shell-command-in-root"
+  (describe "when called directly in elisp"
+    (before-each (spy-on 'async-shell-command))
+    (describe "when called with all three paramters"
+      (it "expects to call async-shell-command with the same parameters"
+        (projectile-run-async-shell-command-in-root "cmd" "output-buffer" "error-buffer")
+        (expect 'async-shell-command :to-have-been-called-with "cmd" "output-buffer" "error-buffer")))
+    (describe "when called with only one optional paramter"
+      (it "expects to call async-shell-command with the same parameters"
+        (projectile-run-async-shell-command-in-root "cmd" "output-buffer")
+        (expect 'async-shell-command :to-have-been-called-with "cmd" "output-buffer" nil)))
+    (describe "when called with no optional paramters"
+      (it "expects to call async-shell-command with the same parameters"
+        (projectile-run-async-shell-command-in-root "cmd")
+        (expect 'async-shell-command :to-have-been-called-with "cmd" nil nil))))
+  (describe "when called interactively"
+    (before-each (spy-on 'async-shell-command))
+    (it "expects to be interactive"
+      (expect (interactive-form 'projectile-run-async-shell-command-in-root) :not :to-be nil))
+    (it "expects to call async-shell-command with the given command"
+      (funcall-interactively 'projectile-run-async-shell-command-in-root "cmd")
+      (expect 'async-shell-command :to-have-been-called-with "cmd" nil nil))))
 
 ;; A bunch of tests that make sure Projectile commands handle
 ;; gracefully the case of being run outside of a project.

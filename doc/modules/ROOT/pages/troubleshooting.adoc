@@ -4,7 +4,7 @@ In case you run into issues here are a few tips that can help you diagnose the
 problem.
 
 Generally, it's not a bad idea to configure Emacs to spit the backtrace on error
-(instead of just logging the error in the `*Messages*` buffer). You can toggle
+(instead of just logging the error in the `+*Messages*+` buffer). You can toggle
 this behavior by using kbd:[M-x] `toggle-debug-on-error`.
 
 == Debugging Projectile commands
@@ -39,7 +39,7 @@ it is pretty simple:
 . Get the report with kbd:[M-x] `profiler-report`.
 
 TIP: If you intend to share the profiling results with someone it's a good idea to
- save the report buffer to a file with <kbd>C-x C-w</kbd>.
+ save the report buffer to a file with kbd:[C-x C-w].
 
 == Commonly encountered problems (and how to solve them)
 
@@ -61,3 +61,14 @@ least what's being required).
 
 Emacs doesn't load the new files, it only installs them on disk.  To see the
 effect of changes you have to restart Emacs.
+
+=== Some commands not working properly with the fish shell
+
+I'm not sure what's causing this (likely different quoting rules), but it's easy to fix it:
+
+[source,elisp]
+----
+(setq shell-file-name "/bin/bash")
+----
+
+In general, I've noticed that Emacs doesn't play very well with fish.

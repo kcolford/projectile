@@ -2,12 +2,34 @@
 
 ## master (unreleased)
 
+### New features
+
+* [#1680](https://github.com/bbatsov/projectile/pull/1680): Add support for recursive project discovery
+* [#1671](https://github.com/bbatsov/projectile/pull/1671)/[#1679](https://github.com/bbatsov/projectile/pull/1679) Allow the `:test-dir` and `:src-dir` options of a project to be set to functions for more flexible test switching.
+
+### Bugs fixed
+
+* [#1550](https://github.com/bbatsov/projectile/issues/1550): Make `projectile-regenerate-tags` tramp-aware.
+* [#1673](https://github.com/bbatsov/projectile/issues/1673): Fix CMake system-preset filename.
+
+## 2.4.0 (2021-05-27)
+
+### New features
+
+* Add `projectile-<cmd>-use-comint-mode` variables (where `<cmd>` is `configure`, `compile`, `test`, `install`, `package`, or `run`). These enable interactive compilation buffers.
+* Add `projectile-update-project-type` function for updating the properties of existing project types.
+* [#1658](https://github.com/bbatsov/projectile/pull/1658): New command `projectile-reset-known-projects`.
+* [#1656](https://github.com/bbatsov/projectile/pull/1656): Add support for CMake configure, build and test presets. Enabled by setting `projectile-cmake-presets` to non-nil, disabled by default.
+* Add optional parameters to `projectile-run-shell-command-in-root` and `projectile-run-async-shell-command-in-root`
+
 ### Changes
 
 * Add `project` param to `projectile-generate-process-name`.
 * [#1608](https://github.com/bbatsov/projectile/pull/1608): Use rebar3 build system by default for Erlang projects.
 * Rename `projectile-project-root-files-functions` to `projectile-project-root-functions`.
 * [#1647](https://github.com/bbatsov/projectile/issues/1647): Use "-B" in the mvn commands to avoid ANSI coloring clutter in the compile buffer
+* [#1657](https://github.com/bbatsov/projectile/pull/1657): Add project detection for Debian packaging directories.
+* [#1656](https://github.com/bbatsov/projectile/pull/1656): CMake compilation-dir removed to accomodate preset support, commands adjusted to run from project-root, with "build" still being the default build-directory. The non-preset test-command now uses "cmake" with "--target test" instead of "ctest".
 
 ### Bugs fixed
 
@@ -16,6 +38,9 @@
 * [#1438](https://github.com/bbatsov/projectile/pull/1438): Make sure `projectile-files-via-ext-command` returns files, not errors.
 * [#1450](https://github.com/bbatsov/projectile/pull/1450): Call `switch-project-action` within project's temp buffer.
 * [#1340](https://github.com/bbatsov/projectile/pull/1340): Fix remote projects being removed if TRAMP can't connect.
+* [#1655](https://github.com/bbatsov/projectile/pull/1655): Fix `projectile-replace-regexp` searching the wrong files when called with prefix arg.
+* [#1659](https://github.com/bbatsov/projectile/issues/1659): Fix `projectile-project-vcs` to work outside a project.
+* [#1637](https://github.com/bbatsov/projectile/pull/1661): Integrate with savehist-mode.
 
 ## 2.3.0 (2020-11-27)
 
