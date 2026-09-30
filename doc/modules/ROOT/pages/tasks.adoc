@@ -1,0 +1,413 @@
+= Project commands, tasks & tests
+
+Every project type can carry a set of lifecycle commands (compile, test, run, and so on) and named tasks, and Projectile can run the test at point. This page covers all of that.
+
+== Configure a project's lifecycle commands and other attributes
+
+There are a few variables that are intended to be customized via `.dir-locals.el`.
+
+* for configuration - `projectile-project-configure-cmd`
+* for compilation - `projectile-project-compilation-cmd`
+* for testing - `projectile-project-test-cmd`
+* for installation - `projectile-project-install-cmd`
+* for packaging - `projectile-project-package-cmd`
+* for running - `projectile-project-run-cmd`
+* for configuring the test prefix - `projectile-project-test-prefix`
+* for configuring the test suffix - `projectile-project-test-suffix`
+* for configuring the related-files-fn property - `projectile-project-related-files-fn`
+* for configuring the src-dir property - `projectile-project-src-dir`
+* for configuring the test-dir property - `projectile-project-test-dir`
+
+When these variables have their default value of `nil`, Projectile
+runs the default command for the current project type.  You can
+override this behavior by setting them to either a string to run an
+external command or an Emacs Lisp function:
+
+[source,elisp]
+----
+(setq projectile-project-test-cmd #'custom-test-function)
+----
+
+In addition caching of commands can be disabled by setting the variable
+`projectile-project-enable-cmd-caching` to `nil`. This is useful for
+preset-based CMake projects.
+
+Because the cached command takes precedence over the value from
+`.dir-locals.el` (and the project type default), editing those won't take
+effect until the cache is refreshed. Run `projectile-discard-command-cache`
+to drop the cached commands for the current project so they're re-read on the
+next run. You can also wire it into an `after-save-hook` for `.dir-locals.el`
+buffers if you edit them often.
+
+A project type can also register a command as a *function* rather than a
+string - CMake's preset pickers do this. Such a command is resolved afresh on
+every run, so the picker gets to prompt each time instead of being frozen after
+the first run. Editing what it offers you at the prompt overrides it: the
+edited command is remembered like any other, and `projectile-discard-command-cache`
+hands the project back to the function.
+
+By default, Projectile will not add consecutive duplicate commands to its
+command history.  To alter this behaviour you can use `projectile-command-history-ignore-duplicates`.
+  The default value of `t` means consecutive duplicates are ignored, a value
+of `nil` means nothing is ignored, and a value of `'erase'` means only
+the last duplicate is kept in the command history.
+
+Each command type (configure, compile, test, install, package, run) keeps its
+own command history, so when you press kbd:[M-p] at, say, the test prompt you
+only cycle through previous *test* commands instead of a mix of every command
+you've run in the project. `projectile-repeat-last-command` still re-runs the
+most recent command of any type.
+
+[#history-scope]
+=== History across checkouts
+
+Those per-type histories belong to the *repository*, not to the directory. Press
+kbd:[M-p] at the test prompt in a git worktree you made this morning - or in a
+second clone of the same upstream - and you get the commands the project is
+actually tested with, instead of an empty history. They're the same project on
+another branch, after all, and you build them the same way.
+
+Set `projectile-command-history-scope` to `project` to go back to a history per
+directory. Either way a project whose repository Projectile can't identify (see
+xref:across_repositories.adoc[Working across repositories]) keeps its own.
+
+Two things deliberately stay local to the checkout you're in, because both act
+without asking and a remembered command can carry absolute paths back into the
+checkout it was typed in:
+
+* what a command prompt is *pre-filled* with, which is still whatever this
+  checkout last ran;
+* what `projectile-repeat-last-command` replays, so in a fresh worktree it still
+  says nothing has been run yet rather than rebuilding a sibling.
+
+One more thing worth knowing: the history is a ring of a fixed size, so several
+checkouts sharing one means their commands interleave in it. If you keep clones
+of a repository that are built in genuinely different ways - sparse checkouts of
+a monorepo, say - set the option to `project` for those, which works from a
+`.dir-locals.el` since the variable is marked safe.
+
+[#project-tasks]
+== Project tasks
+
+Besides the standard lifecycle commands (compile, test, run, etc.), Projectile
+supports an arbitrary number of *named tasks* per project via
+`projectile-tasks`, an alist mapping task names to commands. Tasks are run
+with `projectile-run-task` (kbd:[s-p c x]), which prompts for a task with
+completion and executes its command exactly like the lifecycle commands (in
+`projectile-compilation-dir`, with `%p` expanded to the project name). Each
+task gets its own compilation buffer, named `+*projectile-task: NAME*+` (with
+the project name appended when `projectile-compilation-buffer-scope` includes
+`project`), so several tasks can run side by side.
+
+image::projectile-run-task.png[projectile-run-task prompting for one of the project's tasks]
+
+A task's command is either a shell command string or a function called with no
+arguments (with `default-directory` at the project root) that returns one.
+
+Tasks can be defined in three places:
+
+* globally, by customizing `projectile-tasks`
+* per project type, via the `:tasks` keyword of
+  `projectile-register-project-type` and `projectile-update-project-type`
+* per project, by setting `projectile-tasks` in `.dir-locals.el`, which makes
+  the tasks shareable with your team through your VCS
+
+On top of those, Projectile discovers the tasks your project's own tooling
+already defines - see <<discovered-tasks,Discovered tasks>> below.
+
+The effective tasks for a project are the project type's tasks merged with
+`projectile-tasks` and the discovered ones; when several define a task with the
+same name, the `projectile-tasks` entry wins, then the project type's. Use
+`projectile-project-tasks` if you need the merged alist programmatically.
+
+Here's a `.dir-locals.el` example:
+
+[source,elisp]
+----
+((nil . ((projectile-tasks . (("lint" . "make lint")
+                              ("docs" . "make docs")
+                              ("release" . "make release VERSION=%p"))))))
+----
+
+NOTE: Only tasks whose commands are strings are treated as safe
+directory-local values; tasks with function commands have to be defined
+globally or via a project type.
+
+And a project-type example:
+
+[source,elisp]
+----
+(projectile-update-project-type
+ 'npm
+ :tasks '(("lint" . "npm run lint")
+          ("outdated" . "npm outdated")))
+----
+
+Like the other lifecycle commands, `projectile-run-task` offers the command
+for confirmation before running it (controlled by the standard
+`compilation-read-command`). Since tasks defined in a project's committed
+`.dir-locals.el` are accepted without the usual risky-local-variable prompt,
+that confirmation is also what stands between you and a task defined by a
+repository you've just checked out - the same trade-off Emacs's
+`compile-command` makes.
+
+Invoking `projectile-run-task` with a prefix argument (kbd:[C-u s-p c x]) lets
+you edit the task's command before it's run, which is handy for passing ad-hoc
+arguments. Each task keeps its own command history at that prompt.
+
+`projectile-repeat-last-task` (kbd:[s-p c X]) re-runs the last task executed
+in the current project, including any ad-hoc edits you made to its command,
+without asking again (you confirmed it the first time). It survives Emacs
+restarts when `savehist-mode` is enabled.
+
+[#discovered-tasks]
+=== Discovered tasks
+
+Most projects already list their tasks somewhere - npm scripts, Makefile
+targets, justfile recipes - and retyping those into `projectile-tasks` is
+busy-work. Projectile reads them straight out of the project instead, so
+`projectile-run-task` is useful in a fresh checkout without any configuration.
+
+Out of the box it knows about:
+
+image::projectile-discovered-tasks.png[projectile-run-task offering npm scripts and Makefile targets discovered in the project]
+
+|===
+| Source | File | Tasks named
+
+| npm scripts
+| `package.json`
+| `npm:build`, or `pnpm:` / `yarn:` / `bun:` depending on the lock file
+
+| Deno tasks
+| `deno.json`, `deno.jsonc`
+| `deno:dev`
+
+| Composer scripts
+| `composer.json`
+| `composer:lint`
+
+| just recipes
+| `justfile`, `.justfile`, `Justfile`
+| `just:build`
+
+| go-task tasks
+| `Taskfile.yml` and friends
+| `task:build`
+
+| rake tasks
+| `Rakefile`, plus the `.rake` files in `rakelib`, `tasks` and `lib/tasks`
+| `rake:db:migrate`
+
+| Make targets
+| `Makefile`, `makefile`, `GNUmakefile`
+| `make:test`
+|===
+
+Discovered tasks carry the name of the tool that defines them, so they never
+collide with the tasks you configure yourself, and you can tell at the prompt
+where a task came from. Only plain named Make targets are offered - pattern
+rules, file targets and the dot-targets aren't things you'd run by hand.
+
+Rake tasks are read out of the project's task files rather than by running
+`rake -T`, which would mean loading the whole application just to fill a
+completion prompt. Tasks are qualified with the `namespace` blocks they sit in
+(`rake:db:migrate`), and run through `bundle exec` when the project has a
+`Gemfile`. A task whose name is computed at runtime (`task type, [:id]`) can't
+be known without running rake, so it isn't listed.
+
+Set `projectile-discover-tasks` to nil to turn this off, or customize
+`projectile-task-providers` to add your own. A provider is a function taking
+the project root and returning an alist of `(TASK-NAME . COMMAND)`; one that
+signals an error is skipped, so a malformed manifest can't break the command.
+
+The manifests are read on each invocation rather than cached, and providers
+never shell out, so nothing has to be re-indexed when you add a script.
+
+[#subprojects]
+== Monorepos and subprojects
+
+A monorepo is a single project as far as version control is concerned, and
+that's how Projectile treats it too - the repository is the project, and
+finding files or searching covers all of it. But its parts usually have
+manifests of their own (a crate, a package, a Maven module), and building or
+testing the whole repository when you're working on one of them is wasteful.
+
+Projectile calls those parts *subprojects*, and finds them in one of two
+ways - `projectile-subproject-functions` decides which, trying each in turn
+until one has an answer.
+
+*The workspace's own member list*, when the repository declares one in a form
+Projectile can read: pnpm (`pnpm-workspace.yaml`), npm, yarn and bun
+(`workspaces` in `package.json`), Cargo (`[workspace] members`, minus
+`exclude`) and Go (`go.work`). This is the better answer where it exists,
+because a workspace knows which of its directories are members and which are
+not - a test fixture that happens to carry a `package.json`, a scaffolding
+template, a fuzzing crate kept out of the build. In Babel's repository that is
+the difference between 162 members and 205 directories holding a manifest.
+
+*A scan for manifests*, otherwise. What counts as a manifest comes from
+`projectile-subproject-markers`, which by default is derived from the
+registered project types, so every type Projectile knows about - including the
+ones you register yourself - is recognized. The scan reads the project's own
+file listing, so the xref:ignoring.adoc[ignore rules] apply and a vendored
+dependency's manifest doesn't count.
+
+The scan is the fallback rather than a legacy path, because some build tools
+compute their member list instead of declaring it: Gradle assembles it in a
+Kotlin or Groovy program and Bazel in Starlark, and neither can be read
+without running the tool. A polyglot repository works either way: a
+`Cargo.toml` under a `package.json` project is still a subproject.
+
+* `projectile-find-file-in-subproject` (kbd:[s-p c m f]) prompts for a
+  subproject and then completes over just its files.
++
+image::projectile-find-file-in-subproject.png["The subproject prompt, listing the parts of a monorepo"]
+* Every lifecycle command has a subproject variant, bound one level down from
+  the project-wide one: `projectile-configure-subproject` (kbd:[s-p c m o]),
+  `-compile-` (kbd:[s-p c m c]), `-test-` (kbd:[s-p c m t]), `-install-`
+  (kbd:[s-p c m i]), `-package-` (kbd:[s-p c m p]) and `-run-`
+  (kbd:[s-p c m r]). They run in the *nearest* subproject - the one containing
+  the file you're visiting - rather than at the project root.
+
+The prompt tells you where the command will run (`Test command in
+services/api/:`), so a subproject build is never mistaken for a whole-project
+one. A project type that builds in a subdirectory keeps doing so, relative to
+the subproject: in a Meson monorepo kbd:[s-p c m c] runs ninja in
+`sub/build/`, not in `sub/`.
+
+If there's no manifest between the current file and the project root, those
+commands say so rather than silently building the whole repository.
+
+=== Which command a subproject runs
+
+A subproject gets its *own* project type, so a Rust crate under a JavaScript
+repository is built with Cargo rather than with the repository's npm. Type
+detection is rooted at the member, which is what
+`projectile-subproject-type` reports.
+
+There is one deliberate exception. A member of a JavaScript workspace holds
+nothing but a `package.json`, so on its own it reads as a plain `node`
+project - and running `npm test` inside a pnpm or yarn workspace is worse
+than what the repository would have run. When the member and the repository
+are identified by the same manifest, the repository's type is the more
+specific reading and it wins. In practice: a pnpm workspace keeps running
+`pnpm test` in its packages, while a `Cargo.toml` or `go.mod` under that same
+repository switches to `cargo` or `go`.
+
+The usual overrides still come first, so a member that needs something else
+can say so in its own `.dir-locals.el`:
+
+[source,elisp]
+----
+;;; packages/legacy/.dir-locals.el
+((nil . ((projectile-project-test-cmd . "make check"))))
+----
+
+TIP: If you would rather each member be a project in its own right - its own
+find-file, its own switch target - add its manifest to
+`projectile-project-root-files-bottom-up`. That is the trade the other way:
+the members get everything a project has, and the repository stops being one,
+so finding a file across the whole monorepo is no longer possible. Emacs's
+built-in `project.el` offers the same choice through
+`project-vc-extra-root-markers`.
+
+== Running the test at point
+
+While `projectile-test-project` runs a project's whole test suite,
+`projectile-run-test-at-point` (kbd:[s-p c .]) runs just the test your
+cursor is on. It uses the buffer's tree-sitter parse tree to find the
+test enclosing point, so it requires Emacs 29+ built with tree-sitter
+support and a tree-sitter major mode (e.g. `python-ts-mode`).
+
+Out of the box the following languages are supported:
+
+|===
+| Major mode | Test | Command
+
+| `python-ts-mode`
+| `test_`-prefixed functions
+| `python -m pytest FILE::NAME`
+
+| `go-ts-mode`
+| `TestXxx` functions
+| `go test -run '^NAME$' ./DIR`
+
+| `js-ts-mode`, `typescript-ts-mode`, `tsx-ts-mode`
+| `it`/`test`/`describe` blocks (jest-style)
+| `npx jest FILE -t 'NAME'`
+
+| `ruby-ts-mode`
+| `it`/`describe` blocks (RSpec) and `test_`-prefixed methods (Minitest)
+| `bundle exec rspec FILE -e 'NAME'` or `bundle exec ruby -Itest FILE -n NAME`, whichever the project type calls for
+
+| `rust-ts-mode`
+| functions carrying a `#[test]` attribute
+| `cargo test -- --exact NAME`
+
+| `elixir-ts-mode`
+| `test`/`describe` blocks (ExUnit)
+| `mix test FILE:LINE`
+
+| `java-ts-mode`
+| methods annotated `@Test` (also `@ParameterizedTest`, `@RepeatedTest`)
+| `mvn test -Dtest=Class#NAME`, or the `./gradlew --tests` form in a Gradle project
+
+| `erlang-ts-mode`
+| functions whose name ends in `_test` or `_test_` (EUnit)
+| `rebar3 eunit --test=module:NAME`
+
+| `fsharp-ts-mode`
+| bindings attributed `[<Fact>]`, `[<Theory>]`, `[<Test>]`, `[<TestCase>]` or `[<Property>]`
+| `dotnet test --filter FullyQualifiedName~NAME`
+|===
+
+A few of these are decided at run time rather than by major mode. Ruby is
+written the same way whichever framework you use, so the project type picks
+between RSpec and Minitest; Java's is picked the same way between Maven and
+Gradle, and the class name comes from the file, since Java requires them to
+match. ExUnit has no way to select a test by name from the command line, so
+Elixir tests are addressed by line instead. Erlang takes the module from the
+file name, the way EUnit addresses a test, and F# unwraps a name written
+between double backticks, since that is what the test framework sees.
+
+The cursor decides which test runs - here it sits in the second of the
+file's two tests, and only that one is handed to `go test`:
+
+image::projectile-test-at-point.gif["With the cursor inside one test function, projectile-run-test-at-point runs just that test and the compilation buffer reports it passing"]
+
+The command runs from the same directory as `projectile-test-project`
+(normally the project root), with the same buffer-saving behavior, but
+it doesn't overwrite the project's remembered test command or command
+history. With a prefix argument you can edit the command before it's
+run, e.g. to add extra flags.
+
+Support for more languages can be added via
+`projectile-test-at-point-rules`, an alist keyed by major mode (matched
+with `derived-mode-p`). Each rule lists the tree-sitter node types that
+can represent a test (`:node-types`), a function extracting the test
+name from such a node, or returning `nil` to keep looking further up
+the tree (`:name-fn`), and a function building the shell command from
+the test name and the file name (`:command-fn`). For example, a rule
+for Rust's `+#[test]+` functions:
+
+[source,elisp]
+----
+(add-to-list 'projectile-test-at-point-rules
+             '(rust-ts-mode
+               :node-types ("function_item")
+               :name-fn (lambda (node)
+                          ;; Any function will do; cargo test matches by name.
+                          (treesit-node-text
+                           (treesit-node-child-by-field-name node "name") t))
+               :command-fn (lambda (test-name _file-name)
+                             (format "cargo test %s -- --exact"
+                                     (shell-quote-argument test-name)))))
+----
+
+WARNING: The test name and file name a `:command-fn` receives come from
+the buffer's source and the repository, so pass them through
+`shell-quote-argument` (as the built-in rules and the example above do)
+rather than interpolating them into the command as-is. Otherwise a
+crafted test name or file name in a checked-out project could inject
+shell code.

@@ -1,6 +1,6 @@
 = Projects
 
-== Supported Project Types
+== Supported project types
 
 One of the main goals of Projectile is to operate on a wide range of project types
 without the need for any configuration. To achieve this it contains a lot of
@@ -19,7 +19,7 @@ TIP: If you'd like to override the default project detection functions you shoul
 check out `projectile-project-root-functions`. We'll discuss how to tweak in more
 details later in the documentation.
 
-=== Version Control Systems
+=== Version control systems
 
 Projectile considers most version-controlled repos to be
 a project. Out of the box Projectile supports:
@@ -31,119 +31,323 @@ a project. Out of the box Projectile supports:
 * CVS
 * Fossil
 * Darcs
+* Sapling
+* Jujutsu
 
 === File markers
 
 Projectile considers many files to denote the root of a project. Usually those files
-are the configuration files of various build tools. Out of the box the following are supported:
+are the configuration files of various build tools. Out of the box the following are supported
+(a `+` between markers means all of them have to be present, `or` means any one of them will do):
 
 |===
-| File | Project Type
+| Project type | Markers
 
-| rebar.config
-| Rebar project file
+| `alire`
+| `alire.toml`
 
-| project.clj
-| Leiningen project file
+| `angular`
+| `angular.json` or `.angular-cli.json`
 
-| build.boot
-| Boot-clj project file
+| `ansible`
+| `ansible.cfg`
 
-| deps.edn
-| Clojure CLI project file
+| `babashka`
+| `bb.edn`
 
-| SConstruct
-| Scons project file
+| `bazel`
+| `MODULE.bazel` or `WORKSPACE` or `WORKSPACE.bazel`
 
-| default.nix
-| Nix project file
+| `bloop`
+| `.bloop/bloop.settings.json`
 
-| flake.nix
-| Nix flake project file
+| `boot-clj`
+| `build.boot`
 
-| pom.xml
-| Maven project file
+| `buck2`
+| `.buckconfig`
 
-| build.sbt
-| SBT project file
+| `bun`
+| `package.json` + (`bun.lock` or `bun.lockb`)
 
-| build.sc
-| Mill project file
+| `clojure-cli`
+| `deps.edn`
 
-| gradlew
-| Gradle wrapper script
+| `cmake`
+| `CMakeLists.txt`
 
-| build.gradle
-| Gradle project file
+| `crystal-spec`
+| `shard.yml`
 
-| .ensime
-| Ensime configuration file
+| `dart`
+| `pubspec.yaml`
 
-| Gemfile
-| Bundler file
+| `debian`
+| `debian/control`
 
-| requirements.txt
-| Pip file
+| `deno`
+| `deno.json` or `deno.jsonc`
 
-| setup.py
-| Setuptools file
+| `django`
+| `manage.py`
 
-| tox.ini
-| Tox file
+| `docker-compose`
+| `compose.yaml` or `compose.yml` or `docker-compose.yaml` or `docker-compose.yml`
 
-| composer.json
-| Composer project file
+| `dotnet`
+| `projectile-dotnet-project-p` (predicate)
 
-| Cargo.toml
-| Cargo project file
+| `dotnet-sln`
+| `projectile-dotnet-sln-project-p` (predicate)
 
-| mix.exs
-| Elixir mix project file
+| `dub`
+| `dub.json` or `dub.sdl`
 
-| stack.yaml
-| Haskell's stack tool based project
+| `elixir`
+| `mix.exs`
 
-| dune-project
-| OCaml Dune project file
+| `elm`
+| `elm.json`
 
-| info.rkt
-| Racket package description file
+| `emacs-cask`
+| `Cask`
 
-| DESCRIPTION
-| R package description file
+| `emacs-eask`
+| `Eask`
 
-| TAGS
-| etags/ctags are usually in the root of project
+| `emacs-eldev`
+| `projectile-eldev-project-p` (predicate)
 
-| GTAGS
-| GNU Global tags
+| `erlang-mk`
+| `erlang.mk`
 
-| configure.in
-| autoconf old style
+| `flutter`
+| `projectile-flutter-project-p` (predicate)
 
-| configure.ac
-| autoconf new style
+| `foundry`
+| `foundry.toml`
 
-| cscope.out
-| cscope
+| `fpm`
+| `fpm.toml`
 
-| Makefile
-| Make
+| `gleam`
+| `gleam.toml`
 
-| CMakeLists.txt
-| CMake
+| `gnumake`
+| `GNUmakefile`
 
-| WORKSPACE
-| Bazel workspace file
+| `go`
+| `projectile-go-project-p` (predicate)
 
-| debian/control
-| Debian package dpkg control file
+| `go-task`
+| `Taskfile.yml` or `Taskfile.yaml` or `Taskfile.dist.yml` or `Taskfile.dist.yaml`
+
+| `godot`
+| `project.godot`
+
+| `gradle`
+| `build.gradle` or `build.gradle.kts` or `settings.gradle` or `settings.gradle.kts`
+
+| `gradlew`
+| `gradlew`
+
+| `grails`
+| `application.yml` + `grails-app`
+
+| `grunt`
+| `Gruntfile.js`
+
+| `gulp`
+| `gulpfile.js`
+
+| `haskell-cabal`
+| `projectile-cabal-project-p` (predicate)
+
+| `haskell-stack`
+| `stack.yaml`
+
+| `helm`
+| `Chart.yaml`
+
+| `hugo`
+| `hugo.toml` or `hugo.yaml` or `hugo.json`
+
+| `jekyll`
+| `_config.yml`
+
+| `julia`
+| `Project.toml`
+
+| `just`
+| `justfile` or `.justfile` or `Justfile`
+
+| `lein-midje`
+| `project.clj` + `.midje.clj`
+
+| `lein-test`
+| `project.clj`
+
+| `make`
+| `projectile-make-project-p` (predicate)
+
+| `maven`
+| `pom.xml`
+
+| `meson`
+| `meson.build`
+
+| `mill`
+| `projectile-mill-project-p` (predicate)
+
+| `mise`
+| `mise.toml` or `.mise.toml`
+
+| `mkdocs`
+| `mkdocs.yml`
+
+| `nextjs`
+| `next.config.js` or `next.config.mjs` or `next.config.ts`
+
+| `nim-nimble`
+| `projectile-nimble-project-p` (predicate)
+
+| `nix`
+| `default.nix`
+
+| `nix-flake`
+| `flake.nix`
+
+| `node`
+| `package.json`
+
+| `npm`
+| `package.json` + `package-lock.json`
+
+| `nx`
+| `nx.json`
+
+| `ocaml-dune`
+| `dune-project`
+
+| `pants`
+| `pants.toml`
+
+| `php-composer`
+| `composer.json`
+
+| `php-laravel`
+| `composer.json` + `artisan`
+
+| `php-symfony`
+| `composer.json` + (`bin/console` or `app/console`)
+
+| `platformio`
+| `platformio.ini`
+
+| `pnpm`
+| `package.json` + `pnpm-lock.yaml`
+
+| `pulumi`
+| `Pulumi.yaml`
+
+| `python-pdm`
+| `pdm.lock`
+
+| `python-pip`
+| `requirements.txt`
+
+| `python-pipenv`
+| `Pipfile`
+
+| `python-pkg`
+| `setup.py`
+
+| `python-poetry`
+| `poetry.lock`
+
+| `python-toml`
+| `pyproject.toml`
+
+| `python-tox`
+| `tox.ini`
+
+| `python-uv`
+| `uv.lock`
+
+| `quarto`
+| `_quarto.yml`
+
+| `r`
+| `DESCRIPTION`
+
+| `racket`
+| `info.rkt`
+
+| `rails-rspec`
+| `Gemfile` + `app` + `lib` + `db` + `config` + `spec`
+
+| `rails-test`
+| `Gemfile` + `app` + `lib` + `db` + `config` + `test`
+
+| `rebar`
+| `rebar.config`
+
+| `ruby-rspec`
+| `Gemfile` + `lib` + `spec`
+
+| `ruby-test`
+| `Gemfile` + `lib` + `test`
+
+| `rust-cargo`
+| `Cargo.toml`
+
+| `sbt`
+| `build.sbt`
+
+| `scala-cli`
+| `project.scala`
+
+| `scons`
+| `SConstruct`
+
+| `swift-spm`
+| `Package.swift`
+
+| `terraform`
+| `projectile-terraform-project-p` (predicate)
+
+| `turborepo`
+| `turbo.json`
+
+| `xcode`
+| `projectile-xcode-project-p` (predicate)
+
+| `xmake`
+| `xmake.lua`
+
+| `yarn`
+| `package.json` + `yarn.lock`
+
+| `zig`
+| `build.zig` or `build.zig.zon`
+
+| `zola`
+| `config.toml` + `content`
+
 |===
 
 There's also Projectile's own `.projectile` which serves both as a project marker
-and a configuration file. We'll talk more about later in this section.
+and a configuration file. See xref:ignoring.adoc[Ignoring files] for its ignore/keep rules.
 
-== Adding Custom Project Types
+Plenty of projects match more than one of these - a Django application has a
+`pyproject.toml`, a Laravel one has a `package.json` for its assets, and all sorts of
+projects ship a `justfile` or a Compose file. Projectile tries the types from the most
+specific to the least, so the framework wins over the packaging tool, and the packaging
+tool wins over the generic task runner. `projectile-doctor` reports which type matched
+and on which marker, which is the quickest way to find out why a project came out the
+way it did.
+
+== Adding custom project types
 
 If a project you are working on is recognized incorrectly or you want
 to add your own type of projects you can add following to your Emacs
@@ -162,14 +366,42 @@ initialization code
 What this does is:
 
 . add your own type of project, in this case `npm` package.
-. add a list of files and/or folders in a root of the project that helps to identify the type, in this case it is only `package.json`.
-. add _project-file_, which is typically the primary project configuration file. In this case that's `package.json`.
+. add a list of files and/or folders in a root of the project that helps to identify the type, in this case it is only `package.json`. When you list several markers, *all* of them must be present for the type to match (logical AND). A marker can also be an alternatives clause of the form `(:any "file1" "file2")`, which matches when *any* one of its files is present - that's how a type covers a build file with several spellings, e.g. `'((:any "build.gradle" "build.gradle.kts"))`. For anything more involved the marker list can be replaced by a function which takes a project root as argument and returns non-nil when that directory has the correct project structure for the type.
+. add _project-file_, which is typically the primary project configuration file. In this case that's `package.json`. When omitted it defaults to the first marker file (so the explicit `:project-file` above is optional here); supply it explicitly when the marker is a function or when the primary file differs from the first marker. The value can contain wildcards and/or be a list containing multiple project files to look for. Pass the symbol `none` for a type that should be detected but never anchor a project root (e.g. its marker also shows up outside real projects).
 . add _compile-command_, in this case it is `npm install`.
 . add _test-command_, in this case it is `npm test`.
 . add _run-command_, in this case it is `npm start`.
 . add test files suffix for toggling between implementation/test files, in this case it is `.spec`, so the implementation/test file pair could be `service.js`/`service.spec.js` for example.
 
+Some languages give their tests a different extension from their sources - an
+Elixir module in `lib/foo.ex` is tested by the script `test/foo_test.exs`. Say so
+with `:src-extension` and `:test-extension`, and toggling between the two will
+name the file it offers to create correctly:
+
+[source,elisp]
+----
+(projectile-update-project-type 'elixir
+                                :src-extension "ex"
+                                :test-extension "exs")
+----
+
+When a type says nothing about them, a test keeps the extension of the file it
+belongs to, which is what most languages want.
+
 Let's see a couple of more complex examples.
+
+[source,elisp]
+----
+;; .NET C# or F# projects
+(projectile-register-project-type 'dotnet #'projectile-dotnet-project-p
+                                  :project-file '("?*.csproj" "?*.fsproj")
+                                  :compile "dotnet build"
+                                  :run "dotnet run"
+                                  :test "dotnet test")
+----
+
+This example uses _projectile-dotnet-project-p_ to validate the project's structure.
+Since C# and F# project files have names containing the name of the project, it uses a list of wildcards to specify the different valid _project-file_ name patterns.
 
 [source,elisp]
 ----
@@ -185,7 +417,7 @@ Let's see a couple of more complex examples.
 ;; Ruby + Minitest
 (projectile-register-project-type 'ruby-test '("Gemfile" "lib" "test")
                                   :project-file "Gemfile"
-                                  :compile"bundle exec rake"
+                                  :compile "bundle exec rake"
                                   :src-dir "lib/"
                                   :test "bundle exec rake test"
                                   :test-suffix "_test")
@@ -210,7 +442,7 @@ Let's see a couple of more complex examples.
 
 All those projects are using `Gemfile` (``bundler``'s project file), but they have different directory structures.
 
-Bellow is a listing of all the available options for `projectile-register-project-type`:
+Below is a listing of all the available options for `projectile-register-project-type`:
 
 |===
 | Option | Documentation
@@ -253,10 +485,16 @@ Bellow is a listing of all the available options for `projectile-register-projec
 
 | :related-files-fn
 | A function to specify test/impl/other files in a more flexible way.
+
+| :file-kinds
+| An alist declaratively describing the kinds of files the project type has (e.g. Rails models, controllers and views). See <<finding-files-by-kind,Finding files by kind>>.
+
+| :tasks
+| An alist of named tasks of the form `(TASK-NAME . COMMAND)`, run via `projectile-run-task`. See xref:tasks.adoc#project-tasks[Project tasks].
 |===
 
 [discrete]
-==== Returning Projectile Commands from a function
+==== Returning Projectile commands from a function
 
 You can also pass a symbolic reference to a function into your project type definition if you wish to define the compile command dynamically:
 
@@ -285,7 +523,7 @@ You can also pass a symbolic reference to a function into your project type defi
                                   :test 'my/test-command)
 ----
 
-If you would now navigate to a file that has the `*.java` extension under the `./tests/` directory and hit `C-c c p` you
+If you would now navigate to a file that has the `*.java` extension under the `./tests/` directory and hit `C-c p c` you
 will see `./gradlew build` as the suggestion. If you were to navigate to a HTML file the compile command will have switched
 to `./gradlew compile-templates`.
 
@@ -301,7 +539,7 @@ Note that your function has to return a string to work properly.
 === Related file location
 
 The `:test-prefix` and `:test-suffix` will work regardless of file extension
-or directory path should and be enough for simple projects.  The
+or directory path and should be enough for simple projects.  The
 `projectile-other-file-alist` variable can also be set to find other files
 based on the extension.
 
@@ -367,7 +605,7 @@ Notes:
 of a function can be fast as it does not iterate over each source file.
 . There is a difference in behaviour between no key and `nil` value for the
 key. Only when the key does not exist, other project options such as
-`:test_prefix` or `projectile-other-file-alist` mechanism is tried.
+`:test-prefix` or `projectile-other-file-alist` mechanism is tried.
 . If the `:test-dir` option is set to a function, this will take precedence over
 any value for `:related-files-fn` set when `projectile-toggle-between-implementation-and-test` is called.
 
@@ -401,9 +639,9 @@ A custom function for the project using multiple programming languages with diff
 (defun my/related-files(file)
   (let ((ext-to-test-prefix '(("cpp" . "Test")
                               ("py" . "test_"))))
-    (if-let ((ext (file-name-extension file))
-             (test-prefix (assoc-default ext ext-to-test-prefix))
-             (file-name (file-name-nondirectory file)))
+    (if-let* ((ext (file-name-extension file))
+              (test-prefix (assoc-default ext ext-to-test-prefix))
+              (file-name (file-name-nondirectory file)))
         (if (string-prefix-p test-prefix file-name)
             (let ((suffix (concat "/" (substring file-name (length test-prefix)))))
               (list :impl (lambda (other-file)
@@ -442,7 +680,8 @@ Projectile includes a couple of helpers to generate commonly used custom functio
 | Relates files with suffix and extension as :test and :impl.
 |===
 
-Each helper means `projectile-related-files-fn-helper-name` function.
+Each helper corresponds to a `projectile-related-files-fn-<name>` function
+(e.g. the `groups` row is `projectile-related-files-fn-groups`).
 
 ==== Example usage of projectile-related-files-fn-helpers
 
@@ -464,7 +703,152 @@ Each helper means `projectile-related-files-fn-helper-name` function.
    :related-files-fn my/related-files)
 ----
 
-=== Editing Existing Project Types
+[#finding-files-by-kind]
+=== Finding files by kind
+
+Many frameworks organize files into well-known _kinds_ - Rails has models,
+controllers, views and helpers; Django has models, views, urls and admin
+modules; and so on. The `:file-kinds` option lets a project type describe
+these kinds declaratively, which powers two commands:
+
+* `projectile-find-file-of-kind` (`s-p j`) - prompt for a kind and then
+  complete over just the project files of that kind.
+* `projectile-toggle-related-file` (`s-p J`) - the generalized counterpart
+  of `projectile-toggle-between-implementation-and-test`: from a file, jump
+  to the related files of _other_ kinds. When only one related kind exists
+  it jumps immediately; when several exist the first invocation prompts for
+  the kind and repeated invocations cycle through them in table order.
+
+`:file-kinds` is an alist of `(KIND . SPEC)` where `KIND` is a keyword (e.g.
+`:model`) and `SPEC` is a plist:
+
+|===
+| Key | Value
+
+| :path
+| A root-relative directory prefix the file must live under, e.g. `"app/models/"`.
+
+| :prefix
+| A basename prefix the file must have.
+
+| :suffix
+| A basename suffix the file must have, e.g. `"_controller.rb"`.
+
+| :key-fn
+| A function of the file's project-relative path returning its _resource key_ string, or nil when the file is not of this kind. When omitted, the key is the basename with `:prefix`/`:suffix` (or, lacking a suffix, the extension) stripped.
+
+| :file-fn
+| Reserved for a future inverse of `:key-fn`; currently unused.
+|===
+
+A file belongs to a kind when it lives under `:path` (if given) and its
+basename matches `:prefix`/`:suffix` (if given). Two files of different
+kinds are _related_ when their resource keys are equal.
+
+Under the hood `:file-kinds` compiles down to a `:related-files-fn`, so it
+rides on the same machinery as the related-file commands above. When a
+project type sets both `:file-kinds` and `:related-files-fn`, the two are
+combined, so declarative and hand-written relations coexist.
+
+==== Built-in examples
+
+The `rails-test`, `rails-rspec`, `django`, `elixir` (Phoenix), `php-laravel`
+and `nextjs` project types ship with `:file-kinds` tables. Rails relates a resource's model, controller, views
+and helper by a shared singular key:
+
+[source,elisp]
+----
+;; app/models/user.rb          <-> :model  (key "user")
+;; app/controllers/users_controller.rb <-> :controller (key "user")
+;; app/views/users/*           <-> :view   (key "user")
+;; app/helpers/users_helper.rb <-> :helper (key "user")
+----
+
+Because controllers, helpers and views are named after the _plural_ resource
+while models use the _singular_, the Rails key functions singularize the
+name via `projectile--singularize`. That helper only handles the regular
+English cases (a trailing `-ies` becomes `-y`, `-ses`/`-xes`/`-zes`/`-ches`/
+`-shes` drop the `-es`, and any other trailing `-s` is dropped); irregular
+nouns (person/people, child/children) are not handled and would need a
+custom `:key-fn`.
+
+The other four need no inflection, and between them they show the three shapes
+a key can take.
+
+Phoenix names a resource's modules after it but scatters them under a web
+directory named after the application, so the key is the base name with the
+role suffix removed and the directory ignored:
+
+[source,elisp]
+----
+;; lib/shop_web/controllers/user_controller.ex <-> :controller (key "user")
+;; lib/shop_web/controllers/user_html.ex       <-> :html       (key "user")
+;; lib/shop_web/live/user_live.ex              <-> :live       (key "user")
+----
+
+`:view` is the Phoenix 1.6 spelling that `:html` replaced in 1.7; a project
+will have one or the other.
+
+Laravel keys on the model's class name, which its companions are named after:
+
+[source,elisp]
+----
+;; app/Models/User.php                        <-> :model      (key "User")
+;; app/Http/Controllers/UserController.php    <-> :controller (key "User")
+;; database/factories/UserFactory.php         <-> :factory    (key "User")
+;; database/seeders/UserSeeder.php            <-> :seeder     (key "User")
+;; app/Policies/UserPolicy.php                <-> :policy     (key "User")
+----
+
+NOTE: Blade views are deliberately left out. They live in snake_case plural
+directories while the classes are StudlyCase singular, so relating them would
+need both inflection and case conversion, and would guess wrong often enough
+not to be worth it. Add them with a `:key-fn` of your own if your project is
+consistent about it.
+
+Next.js uses the app router's fixed file names in a shared directory, so the
+directory is the key - and each kind matches the name plus its dot, which
+covers `.js`, `.jsx`, `.ts` and `.tsx` alike:
+
+[source,elisp]
+----
+;; app/dashboard/page.tsx    <-> :page    (key "app/dashboard")
+;; app/dashboard/layout.tsx  <-> :layout  (key "app/dashboard")
+;; app/dashboard/loading.tsx <-> :loading (key "app/dashboard")
+----
+
+Django needs no inflection either - all of an app's files live in the same
+directory, so the key is simply that directory's name:
+
+[source,elisp]
+----
+;; polls/models.py <-> polls/views.py <-> polls/urls.py  (key "polls")
+----
+
+==== Defining kinds for another framework
+
+To teach Projectile about another framework's kinds, register (or update) a
+project type with a `:file-kinds` table. For example, a hypothetical
+framework whose components live under `src/components/` as
+`foo.component.ts` with matching `foo.template.html` and `foo.style.css`:
+
+[source,elisp]
+----
+(projectile-update-project-type
+ 'my-framework
+ :file-kinds
+ '((:component . (:path "src/components/" :suffix ".component.ts"))
+   (:template  . (:path "src/components/" :suffix ".template.html"))
+   (:style     . (:path "src/components/" :suffix ".style.css"))))
+----
+
+The default `:key-fn` strips each kind's `:suffix`, so all three files
+yield the key `"foo"` and relate to one another. Supply a custom `:key-fn`
+only when the key can't be derived from a simple prefix/suffix - for
+instance when it lives in a directory name (as with Rails views and Django
+apps) or needs inflection.
+
+=== Editing existing project types
 
 You can also edit specific options of already existing project types:
 
@@ -481,6 +865,22 @@ You can also edit specific options of already existing project types:
 ----
 
 This will change the value of the `related-files-fn` option, remove the `test-prefix` option and `:precedence 'high` sets the sbt project type to be chosen in preference to other potentially clashing project types (a value `'low` would do the opposite).
+
+=== Removing a project type
+
+If a built-in project type mis-detects your projects (e.g. a language
+manifest that also appears in subdirectories of a larger repo), you can
+unregister it entirely:
+
+[source,elisp]
+----
+(projectile-remove-project-type 'nix)
+----
+
+NOTE: Don't try to disable a type by clearing its markers with
+`(projectile-update-project-type 'nix :marker-files nil)`. An empty marker
+set matches _every_ project rather than none, so the type would be detected
+everywhere. Use `projectile-remove-project-type` instead.
 
 === `:test-dir`/`:src-dir` vs `:related-files-fn`
 
@@ -508,7 +908,7 @@ purposes, using functions can give more flexibility.  As an example consider
             (src-dir (cl-find-if (lambda (d) (f-exists-p (f-join root d)))
                                  src-dir-guesses)))
       (projectile-complementary-dir test-file-path "tests?" src-dir)
-    (error "Could not locate a impl file for %s!" test-file-path)))
+    (error "Could not locate an impl file for %s!" test-file-path)))
 
 (projectile-update-project-type
  'python-pkg
@@ -533,7 +933,41 @@ could be:
 In fact this is a lot more flexible in terms of finding test files in different
 locations, but will not create test files for you.
 
-== Customizing Project Detection
+=== Default source and test directories
+
+When a project type doesn't specify `:src-dir` or `:test-dir`, Projectile falls
+back to these defaults:
+
+[source,elisp]
+----
+(setq projectile-default-src-directory "src/")
+(setq projectile-default-test-directory "test/")
+----
+
+=== Custom test prefix/suffix functions
+
+For advanced use cases you can replace the functions that determine the test
+file prefix and suffix.  These receive the project type and should return the
+appropriate prefix or suffix string:
+
+[source,elisp]
+----
+(setq projectile-test-prefix-function #'my-test-prefix)
+(setq projectile-test-suffix-function #'my-test-suffix)
+----
+
+=== Creating missing test files
+
+By default, when you toggle to a test file that doesn't exist, Projectile will
+signal an error.  If you'd like Projectile to create the missing test file
+automatically:
+
+[source,elisp]
+----
+(setq projectile-create-missing-test-files t)
+----
+
+== Customizing project detection
 
 Project detection is pretty simple - Projectile just runs a list of
 project detection functions
@@ -549,6 +983,7 @@ Let's take a closer look at `projectile-project-root-functions`:
 ----
 (defcustom projectile-project-root-functions
   '(projectile-root-local
+    projectile-root-marked
     projectile-root-bottom-up
     projectile-root-top-down
     projectile-root-top-down-recurring)
@@ -561,17 +996,54 @@ The important thing to note here is that the functions get invoked in their
 order on the list, so the functions earlier in the list will have a higher
 precedence with respect to project detection. Let's examine the defaults:
 
-* `projectile-root-local` looks for project path set via the buffer-local variable `projectile-project-root`. Typically you'd set this variable via `.dir-locals.el` and it will take precedence over everything else.
+* `projectile-root-local` looks for project path set via the buffer-local
+  variable `projectile-project-root`. Typically you'd set this variable via
+  `.dir-locals.el` and it will take precedence over everything else.
 
-* `projectile-root-bottom-up` will start looking for a project marker file/folder(e.g. `.projectile`, `.hg`, `.git`) from the current folder (a.k.a. `default-directory` in Emacs lingo) up the directory tree. It will return the first match it discovers. The assumption is pretty simple - the root marker appear only once, at the root folder of a project. If a root marker appear in several nested folders (e.g. you've got nested git projects), the bottom-most (closest to the current dir) match has precedence. You can customize the root markers recognized by this function via `projectile-project-root-files-bottom-up`
+* `projectile-root-marked` looks for `.projectile` (or whatever you've set as
+  the value of `projectile-dirconfig-file`). The idea is that normally if you
+  have a `.projectile` file you'd like it to override the normal project root
+  discovery logic.
 
-* `projectile-root-top-down` is similar, but it will return the top-most (farthest from the current directory) match. It's configurable via `projectile-project-root-files` and all project manifest markers like `pom.xml`, `Gemfile`, `project.clj`, etc go there.
+* `projectile-root-bottom-up` will start looking for a project marker
+  file/folder (e.g. `.projectile`, `.hg`, `.git`) from the current folder
+  (a.k.a. `default-directory` in Emacs lingo) up the directory tree. It will
+  return the first match it discovers. The bottom-most (closest to the
+  current dir) match wins. The list it searches
+  (`projectile-project-root-files-bottom-up`) holds only VCS markers, so in
+  a monorepo layout where a `.git` sits at the top and a language manifest
+  lives in a subdirectory, the enclosing repository wins - the git repo is
+  the project, matching what most users and IDEs expect. If you instead want
+  a deeper subproject to win, drop a `.projectile` file in it;
+  `projectile-root-marked` runs before this step, so the marked subproject
+  takes precedence over the outer VC root.
 
-* `projectile-root-top-down-recurring` will look for project markers that can appear at every level of a project (e.g. `Makefile` or `.svn`) and will return the top-most match for those.
+* `projectile-root-top-down` is similar, but it will return the top-most
+  (farthest from the current directory) match. It is configurable via
+  `projectile-project-root-files`, which is populated automatically from the
+  project types registered via `projectile-register-project-type` (each
+  type's `:project-file`, or the first of its marker files when no
+  `:project-file` is given). It is consulted after the bottom-up search
+  fails, so it's where the per-language manifests (`deps.edn`, `Cargo.toml`,
+  `pom.xml`, `?*.csproj`, ...) actually get matched.
 
-The default ordering should work well for most people, but depending on the structure of your project you might want to tweak it.
+* `projectile-root-top-down-recurring` will look for project markers that can
+  appear at every level of a project (e.g. `Makefile` or `.svn`) and will return
+  the top-most match for those.
 
-Re-ordering those functions will alter the project detection, but you can also replace the list. Here's how you can delegate the project detection to Emacs's built-in function `vc-root-dir`:
+NOTE: `projectile-root-top-down` only matches *regular files* — directories
+with names listed in `projectile-project-root-files` are skipped.  This is
+why the default seed list contains files like `configure.ac` or `TAGS`
+rather than VCS directories.  `projectile-root-bottom-up` matches both
+files and directories, so VCS markers like `.git` (a directory in normal
+repos, a file in worktrees and submodules) belong on the bottom-up list.
+
+The default ordering should work well for most people, but depending on the
+structure of your project you might want to tweak it.
+
+Re-ordering those functions will alter the project detection, but you can also
+replace the list. Here's how you can delegate the project detection to Emacs's
+built-in function `vc-root-dir`:
 
 [source,elisp]
 ----
@@ -596,81 +1068,124 @@ Similarly, you can leverage the built-in `project.el` like this:
 (setq projectile-project-root-functions '(projectile-project-current))
 ----
 
-== Ignoring files
+=== Repositories inside repositories
 
-WARNING: The contents of `.projectile` are ignored when using the
- `alien` project indexing method.
+A repository checked out inside another project - a straight.el clone under
+`.emacs.d`, a vendored dependency, a git submodule - can reasonably be either
+its own project or part of the enclosing one, and Projectile can't guess which
+you meant. What it does by default follows from the ordering above: since
+`projectile-root-marked` runs first, a `.projectile` file anywhere up the tree
+wins over a nearer `.git`, so an outer `.projectile` makes the whole tree one
+project no matter how many repositories are nested inside it.
 
-If you'd like to instruct Projectile to ignore certain files in a
-project, when indexing it you can do so in the `.projectile` file by
-adding each path to ignore, where the paths all are relative to the
-root directory and start with a slash. Everything ignored should be
-preceded with a `-` sign. Alternatively, not having any prefix at all
-also means to ignore the directory or file pattern that follows.
-Here's an example for a typical Rails application:
+If you want the nested repository to be its own project instead, you have two
+options. Per repository, drop an empty `.projectile` file into it - the nearest
+one wins:
 
+[source,shell]
 ----
--/log
--/tmp
--/vendor
--/public/uploads
-----
-
-This would ignore the folders only at the root of the project.
-Projectile also supports relative pathname ignores:
-
-----
--tmp
--*.rb
--*.yml
--models
+touch straight/repos/some-package/.projectile
 ----
 
-You can also ignore everything except certain subdirectories. This is
-useful when selecting the directories to keep is easier than selecting
-the directories to ignore, although you can do both. To select
-directories to keep, that means everything else will be ignored.
+Or, to make the nearest VCS root win everywhere, put the bottom-up search
+before the marked one:
 
-Example:
-
+[source,elisp]
 ----
-+/src/foo
-+/tests/foo
-----
-
-Keep in mind that you can only include subdirectories, not file
-patterns.
-
-If both directories to keep and ignore are specified, the directories
-to keep first apply, restricting what files are considered. The paths
-and patterns to ignore are then applied to that set.
-
-Finally, you can override ignored files. This is especially useful
-when some files ignored by your VCS should be considered as part of
-your project by projectile:
-
-----
-!/src/foo
-!*.yml
+(setq projectile-project-root-functions
+      '(projectile-root-local
+        projectile-root-bottom-up
+        projectile-root-marked
+        projectile-root-top-down
+        projectile-root-top-down-recurring))
 ----
 
-When a path is overridden, its contents are still subject to ignore
-patterns. To override those files as well, specify their full path
-with a bang prefix.
+With that ordering a `.projectile` only takes effect where no VCS root sits
+closer to the file you're visiting.
 
-If you would like to include comment lines in your .projectile file,
-you can customize the variable `projectile-dirconfig-comment-prefix`.
-Assigning it a non-nil character value, e.g. `#`, will cause lines in
-the .projectile file starting with that character to be treated as
-comments instead of patterns.
+=== Customizing VCS detection
 
-=== File-local project root definitions
+The markers used to detect a project's version-control system live in
+`projectile-vcs-markers`, an ordered alist of marker names and VCS
+symbols (customizable since Projectile 3.1). During the upward search
+the nearest marker directory always wins; the order of the alist only
+breaks ties between markers sitting in the same directory. The main
+use for that is colocated repositories: `jj git init` creates both
+`.jj` and `.git`, and by default such projects are detected as `git`.
+To prefer `jj` instead:
+
+[source,elisp]
+----
+(setq projectile-vcs-markers
+      (cons '(".jj" . jj)
+            (assoc-delete-all ".jj" projectile-vcs-markers)))
+----
+
+You can also add markers for VCSes Projectile doesn't know about;
+file listing then falls back to the generic indexing command and
+`projectile-vc` to `vc-dir`. Note that VCS detection is cached per
+project, so run `projectile-invalidate-cache` after changing the
+variable.
+
+=== Project root cache
+
+To keep `projectile-project-root` cheap (it's called from the mode-line and
+several `find-file-hook` paths), Projectile memoizes the result of every
+project root function in the variable `projectile-project-root-cache`.
+The cache is populated lazily and only invalidated when:
+
+* You call `projectile-invalidate-cache` (`s-p i` by default), which clears
+  both the per-project files cache *and* the project root cache.  The root
+  cache is cleared even when you cancel the project prompt or aren't in a
+  project, so this is also the right command to run after creating a new
+  `.projectile`/`.git`/etc. in a directory that Projectile previously
+  considered rootless.
+* You call `projectile-invalidate-cache-all`, which does the same as
+  `projectile-invalidate-cache` but for every known project at once
+  (remote projects excepted).
+* You call `projectile-discard-root-cache` if you want to clear *only* the
+  project root cache without dropping the per-project file lists - useful
+  when you've just added a marker file and don't want to re-index large
+  projects.
+* You restart Emacs.
+
+The cache is keyed on the search start directory and a positive entry is
+revalidated against the filesystem (via `file-exists-p`) on every lookup, so
+a deleted root naturally invalidates itself.  Negative entries (no project
+found) are also memoized to avoid re-walking the directory tree on every
+call; this is the main source of confusion when adding a marker file:
+*Projectile remembers that the directory was rootless and won't notice the
+new marker until you invalidate the cache.*
+
+If you frequently script Projectile from elisp and need finer-grained
+control, you can clear individual entries with `remhash` against the cache,
+or reset the whole thing with `(setq projectile-project-root-cache
+(make-hash-table :test 'equal))`.
+
+[NOTE]
+====
+The buffer-local file variable `projectile-project-root` is read by
+`projectile-root-local` and is *not* cached, so per-buffer overrides take
+effect immediately even when several buffers share the same directory.
+====
+
+== File-local project root definitions
 
 If you want to override the projectile project root for a specific
 file, you can set the file-local variable `projectile-project-root`. This
 can be useful if you have files within one project that are related to
 a different project (for instance, Org files in one git repo that
 correspond to other projects).
+
+[source,elisp]
+----
+;; -*- projectile-project-root: "/path/to/other/project/" -*-
+----
+
+Override values are read from the buffer-local variable on every lookup
+(they're intentionally exempt from the project root cache), so two buffers
+in the same directory can have different overrides and each will resolve to
+its own root.
 
 == Storing project settings
 
@@ -701,11 +1216,10 @@ function.  It could also be used to e.g. add such a function to a key
 map.
 
 TIP: You can also quickly visit or create the `dir-locals-file` with
-kbd:[s-p E] (kbd:[M-x] `projectile-edit-dir-locals` kbd:[RET]).
+kbd:[s-p E] (kbd:[M-x] `projectile-edit-dir-locals` kbd:[RET]). 3rd party packages may use functions `projectile-add-dir-local-variable`
+and `projectile-delete-dir-local-variable` to store their settings.
 
-Here are a few examples of how to use this feature with Projectile.
-
-== Configuring Projectile's Behavior
+== Configuring Projectile's behavior
 
 Projectile exposes many variables (via `defcustom`) which allow users
 to customize its behavior.  Directory variables can be used to set
@@ -743,34 +1257,124 @@ your project, you could customize it with the following:
 ----
 
 By default, compilation buffers are not writable, which allows you to
-e.g.  press `g` to restart the last command. Setting
-`projectile-<cmd>-use-comint-mode` (where `<cmd>` is `configure`,
-`compile`, `test`, `install`, `package`, or `run`) to a non-nil value
-allows you to make projectile compilation buffers interactive, letting
-you e.g. test a command-line program with `projectile-run-project`.
+e.g.  press `g` to restart the last command. `projectile-use-comint-mode`
+makes them interactive instead, letting you e.g. test a command-line
+program with `projectile-run-project`, or answer a task's sudo prompt.
+Set it to `t` for everything Projectile runs, or to a list of the ones
+you want:
 
 [source,elisp]
 ----
-(setq projectile-comint-mode t)
+;; only the compile buffer is interactive
+(setq projectile-use-comint-mode '(compile))
+
+;; the named tasks are too
+(setq projectile-use-comint-mode '(compile task))
+
+;; everything is
+(setq projectile-use-comint-mode t)
 ----
 
-== Configure a Project's Lifecycle Commands
+You can name the lifecycle phases - `configure`, `compile`, `test`,
+`install`, `package` and `run` - and `task` for the named tasks run by
+`projectile-run-task`.
 
-There are a few variables that are intended to be customized via `.dir-locals.el`.
+== Project buffers
 
-* for configuration - `projectile-project-configure-cmd`
-* for compilation - `projectile-project-compilation-cmd`
-* for testing - `projectile-project-test-cmd`
-* for installation - `projectile-project-install-cmd`
-* for packaging - `projectile-project-package-cmd`
-* for running - `projectile-project-run-cmd`
+Projectile offers a bunch of operations that are operating on the open buffers
+for some project (e.g. `projectile-kill-buffers`). One tricky part here are
+"special buffers" - basically buffers that are not backed by files
+(e.g. `+*dired*+`, `+*scratch+*` and so on). Projectile determines whether a
+special buffer belongs to a project simply by checking the `default-directory`
+for the special buffer, which admittedly might result in some weird results
+(e.g. if you've created a special buffer that's not related to a project, while
+visiting a file belonging to the project).
 
-When these variables have their default value of `nil`, Projectile
-runs the default command for the current project type.  You can
-override this behavior by setting them to either a string to run an
-external command or an Emacs Lisp function:
+That's why Projectile has a couple of configuration options for dealing with
+project buffers - namely `projectile-globally-ignored-buffers` and
+`projectile-globally-ignored-modes`. Both of them take a list of strings or
+regular expressions that will be used to match against a buffer's name or a
+buffer's major mode.
+
+Here are a couple of examples:
 
 [source,elisp]
 ----
-(setq projectile-test-cmd #'custom-test-function)
+;; ignoring specific buffers by name
+(setq projectile-globally-ignored-buffers
+  '("*scratch*"
+    "*lsp-log*"))
+
+;; ignoring buffers by their major mode
+(setq projectile-globally-ignored-modes
+  '("erc-mode"
+    "help-mode"
+    "completion-list-mode"
+    "Buffer-menu-mode"
+    "gnus-.*-mode"
+    "occur-mode"))
 ----
+
+=== Buffer filtering
+
+You can supply a custom filter function for `projectile-project-buffers` via
+`projectile-buffers-filter-function`.  Projectile ships with two built-in
+filters you can use:
+
+[source,elisp]
+----
+;; Only include file-backed buffers
+(setq projectile-buffers-filter-function #'projectile-buffers-with-file)
+
+;; Include file-backed buffers and process buffers (e.g. REPLs, shells)
+(setq projectile-buffers-filter-function #'projectile-buffers-with-file-or-process)
+----
+
+=== Killing project buffers
+
+When you run `projectile-kill-buffers` (kbd:[s-p k]), the variable
+`projectile-kill-buffers-filter` controls which buffers get killed:
+
+[source,elisp]
+----
+;; Kill all project buffers (the default)
+(setq projectile-kill-buffers-filter 'kill-all)
+
+;; Kill only file-visiting buffers (keep shells, REPLs, etc.)
+(setq projectile-kill-buffers-filter 'kill-only-files)
+----
+
+You can also set it to a custom predicate function that receives a buffer and
+returns non-nil if the buffer should be killed.
+
+For finer control there's a small composable condition DSL (modeled on
+`project.el`'s `project-kill-buffer-conditions`). Set the filter to a list of
+conditions and a buffer is killed when it matches any of them:
+
+[source,elisp]
+----
+;; Kill file-visiting buffers and dired buffers, but leave everything else alone
+(setq projectile-kill-buffers-filter
+      '(buffer-file-name (derived-mode . dired-mode)))
+----
+
+Each condition is a buffer-name regexp, a predicate function, or a cons cell:
+`(major-mode . MODE)`, `(derived-mode . MODE)`, `(not COND)`, `(and COND...)`,
+or `(or COND...)`. The last three nest, so you can build arbitrarily specific
+rules. See the docstring of `projectile-kill-buffers-filter` for the details.
+
+=== Uniquifying buffer names by project
+
+When you open same-named files from different projects (say two `README.md`
+files), Emacs's `uniquify` library disambiguates the buffer names using parent
+directory components. Projectile can make that disambiguation use the project
+name instead, via `projectile-uniquify-dirname-transform`:
+
+[source,elisp]
+----
+(setq uniquify-dirname-transform #'projectile-uniquify-dirname-transform)
+----
+
+Outside of a project the directory is left untouched, so this is safe to set
+globally. This mirrors `project.el`'s `project-uniquify-dirname-transform`.
+

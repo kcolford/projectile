@@ -7,3 +7,7 @@
 /dist
 /TAGS
 /project
+/.projectile-cache.eld
+.claude/
+AGENTS.md
+dev/function-coverage.txt

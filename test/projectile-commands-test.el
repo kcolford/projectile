@@ -1,0 +1,1436 @@
+;;; projectile-commands-test.el --- Tests for lifecycle commands (compile/test/run, shell) -*- lexical-binding: t -*-
+
+;; Copyright © 2011-2026 Bozhidar Batsov
+
+;; Author: Bozhidar Batsov <bozhidar@batsov.dev>
+
+;; This file is NOT part of GNU Emacs.
+
+;; This program is free software: you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License as
+;; published by the Free Software Foundation, either version 3 of the
+;; License, or (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful, but
+;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;; General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see `http://www.gnu.org/licenses/'.
+
+;;; Commentary:
+
+;; Tests for lifecycle commands (compile/test/run, shell).
+
+;;; Code:
+
+(require 'projectile-test-helpers)
+
+(describe "projectile-compilation-dir"
+  (it "returns the compilation directory for a project"
+    (cl-flet ((compilation-dir-for (project-root rel-dir)
+                (spy-on 'projectile-project-root :and-return-value project-root)
+                (spy-on 'projectile-project-type :and-return-value 'generic)
+                (let ((projectile-project-compilation-dir rel-dir))
+                  (projectile-compilation-dir))))
+      (expect (compilation-dir-for "/root/" "build") :to-equal "/root/build/")
+      (expect (compilation-dir-for "/root/" "build/") :to-equal "/root/build/")
+      (expect (compilation-dir-for "/root/" "./build") :to-equal "/root/build/")
+      (expect (compilation-dir-for "/root/" "local/build") :to-equal "/root/local/build/")))
+  (it "returns the default compilation dir based on project-type"
+    ;; Bind the alist so the registration doesn't leak into other suites.
+    (let ((projectile-project-types projectile-project-types))
+      (projectile-register-project-type 'default-dir-project '("file.txt")
+                                        :compilation-dir "build")
+      (cl-flet ((compilation-dir-for (project-root &optional rel-dir)
+                  (spy-on 'projectile-project-root :and-return-value project-root)
+                  (spy-on 'projectile-project-type :and-return-value 'default-dir-project)
+                  (if (null rel-dir)
+                      (projectile-compilation-dir)
+                    (let ((projectile-project-compilation-dir rel-dir))
+                      (projectile-compilation-dir)))))
+        (expect (compilation-dir-for "/root/") :to-equal "/root/build/")
+        (expect (compilation-dir-for "/root/" "buildings") :to-equal "/root/buildings/"))))
+  (it "should not fail on bad compilation dir config"
+    (defun -compilation-test-function ()
+      1)
+    (let ((projectile-project-types projectile-project-types)
+          (projectile-project-type 'has-command-at-point)
+          (projectile-project-compilation-dir nil))
+      (projectile-register-project-type 'has-command-at-point '("file.txt")
+                                        :compile (-compilation-test-function))
+      (expect (projectile-compilation-dir) :to-equal (concat (expand-file-name ".") "/")))))
+
+(describe "projectile-default-compilation-command"
+  (it "returns the default compilation command for project-type"
+    (defun -compilation-test-function ()
+      (if (= (point) 1)
+          "my-make"
+        "./run-extra"))
+    (let ((projectile-project-types projectile-project-types))
+      (projectile-register-project-type 'has-command-at-point '("file.txt")
+                                        :compile '-compilation-test-function)
+      (expect (projectile-default-compilation-command 'has-command-at-point) :to-equal "my-make")
+      (with-temp-buffer
+        (insert "ABCDE")
+        (goto-char 2)
+        (expect (projectile-default-compilation-command 'has-command-at-point) :to-equal "./run-extra"))))
+  (it "fails on bad project-type config"
+    (defun -compilation-test-function ()
+      1)
+    (let ((projectile-project-types projectile-project-types))
+      (projectile-register-project-type 'has-command-at-point '("file.txt")
+                                        :compile (-compilation-test-function))
+      (expect (projectile-default-compilation-command 'has-command-at-point) :to-throw))))
+
+(describe "projectile-configure-command"
+  (it "configure command for generic project type"
+    (spy-on 'projectile-default-configure-command :and-return-value nil)
+    (spy-on 'projectile-project-type :and-return-value 'generic)
+    (expect (projectile-configure-command "fsdf") :to-equal nil)))
+
+;;; known projects tests
+
+(describe "projectile-run-shell-command-in-root"
+  (describe "when called directly in elisp"
+    (before-each (spy-on 'shell-command))
+    (describe "when called with all three parameters"
+      (it "expects to call shell-command with the same parameters"
+        (projectile-run-shell-command-in-root "cmd" "output-buffer" "error-buffer")
+        (expect 'shell-command :to-have-been-called-with "cmd" "output-buffer" "error-buffer")))
+    (describe "when called with only one optional parameter"
+      (it "expects to call shell-command with the same parameters"
+        (projectile-run-shell-command-in-root "cmd" "output-buffer")
+        (expect 'shell-command :to-have-been-called-with "cmd" "output-buffer" nil)))
+    (describe "when called with no optional parameters"
+      (it "expects to call shell-command with the same parameters"
+        (projectile-run-shell-command-in-root "cmd")
+        (expect 'shell-command :to-have-been-called-with "cmd" nil nil))))
+  (describe "when called interactively"
+    (before-each (spy-on 'shell-command))
+    (it "expects to be interactive"
+      (expect (interactive-form 'projectile-run-shell-command-in-root) :not :to-be nil))
+    (it "expects to call shell-command with the given command"
+      (funcall-interactively 'projectile-run-shell-command-in-root "cmd")
+      (expect 'shell-command :to-have-been-called-with "cmd" nil nil))))
+
+(describe "projectile-run-async-shell-command-in-root"
+  (describe "when called directly in elisp"
+    (before-each (spy-on 'async-shell-command))
+    (describe "when called with all three parameters"
+      (it "expects to call async-shell-command with the same parameters"
+        (projectile-run-async-shell-command-in-root "cmd" "output-buffer" "error-buffer")
+        (expect 'async-shell-command :to-have-been-called-with "cmd" "output-buffer" "error-buffer")))
+    (describe "when called with only one optional parameter"
+      (it "expects to call async-shell-command with the same parameters"
+        (projectile-run-async-shell-command-in-root "cmd" "output-buffer")
+        (expect 'async-shell-command :to-have-been-called-with "cmd" "output-buffer" nil)))
+    (describe "when called with no optional parameters"
+      (it "expects to call async-shell-command with the same parameters"
+        (projectile-run-async-shell-command-in-root "cmd")
+        (expect 'async-shell-command :to-have-been-called-with "cmd" nil nil))))
+  (describe "when called interactively"
+    (before-each (spy-on 'async-shell-command))
+    (it "expects to be interactive"
+      (expect (interactive-form 'projectile-run-async-shell-command-in-root) :not :to-be nil))
+    (it "expects to call async-shell-command with the given command"
+      (funcall-interactively 'projectile-run-async-shell-command-in-root "cmd")
+      (expect 'async-shell-command :to-have-been-called-with "cmd" nil nil))))
+
+(describe "projectile-discard-command-cache"
+  (it "removes cached commands for the current project across all maps"
+    (let ((projectile-configure-cmd-map (make-hash-table :test 'equal))
+          (projectile-compilation-cmd-map (make-hash-table :test 'equal))
+          (projectile-install-cmd-map (make-hash-table :test 'equal))
+          (projectile-package-cmd-map (make-hash-table :test 'equal))
+          (projectile-test-cmd-map (make-hash-table :test 'equal))
+          (projectile-run-cmd-map (make-hash-table :test 'equal)))
+      (spy-on 'projectile-acquire-root :and-return-value "/proj/a/")
+      ;; one entry per map, plus a subdir compile dir
+      (puthash "/proj/a/" "configure" projectile-configure-cmd-map)
+      (puthash "/proj/a/build/" "make" projectile-compilation-cmd-map)
+      (puthash "/proj/a/" "make install" projectile-install-cmd-map)
+      (puthash "/proj/a/" "make package" projectile-package-cmd-map)
+      (puthash "/proj/a/" "make test" projectile-test-cmd-map)
+      (puthash "/proj/a/" "./run" projectile-run-cmd-map)
+      ;; a different project and a prefix-sharing sibling must survive
+      (puthash "/proj/b/" "other" projectile-compilation-cmd-map)
+      (puthash "/proj/a-extra/" "sibling" projectile-compilation-cmd-map)
+      (projectile-discard-command-cache)
+      (expect (gethash "/proj/a/" projectile-configure-cmd-map) :to-be nil)
+      (expect (gethash "/proj/a/build/" projectile-compilation-cmd-map) :to-be nil)
+      (expect (gethash "/proj/a/" projectile-install-cmd-map) :to-be nil)
+      (expect (gethash "/proj/a/" projectile-package-cmd-map) :to-be nil)
+      (expect (gethash "/proj/a/" projectile-test-cmd-map) :to-be nil)
+      (expect (gethash "/proj/a/" projectile-run-cmd-map) :to-be nil)
+      ;; unrelated project and prefix-sharing sibling are left untouched
+      (expect (gethash "/proj/b/" projectile-compilation-cmd-map) :to-equal "other")
+      (expect (gethash "/proj/a-extra/" projectile-compilation-cmd-map) :to-equal "sibling"))))
+
+(describe "projectile--run-project-cmd"
+
+  (before-each
+    (spy-on 'projectile-run-compilation)
+    (spy-on 'projectile-maybe-read-command :and-call-fake
+            (lambda (arg default-cmd prompt &optional command-type) default-cmd))
+    ;; Stops projectile--run-project-cmd from creating a new directory for
+    ;; the compilation dir
+    (spy-on 'file-directory-p :and-return-value t))
+
+  (it "with :no-cache does not cache the command but still records history"
+    (let ((command-map (make-hash-table :test 'equal))
+          (projectile-project-command-history (make-hash-table :test 'equal))
+          (projectile-project-root "/a/random/path"))
+      (projectile--run-project-cmd "cmake . --preset debug" command-map
+                                   :command-type 'configure :no-cache t)
+      ;; nothing frozen in the cache...
+      (expect (hash-table-count command-map) :to-equal 0)
+      ;; ...but the executed command still feeds both histories, so
+      ;; projectile-repeat-last-command keeps working
+      (expect (ring-elements
+               (projectile--get-command-history projectile-project-root 'configure))
+              :to-equal '("cmake . --preset debug"))
+      (expect (ring-elements
+               (projectile--get-command-history projectile-project-root))
+              :to-equal '("cmake . --preset debug"))))
+
+  (it "caches the command by default"
+    (let ((command-map (make-hash-table :test 'equal))
+          (projectile-project-command-history (make-hash-table :test 'equal))
+          (projectile-project-root "/a/random/path"))
+      (projectile--run-project-cmd "make" command-map :command-type 'compile)
+      (expect (hash-table-count command-map) :to-equal 1)))
+
+  (it "projectile-command-history-ignore-duplicates set to t"
+
+    (let ((command-map (make-hash-table :test 'equal))
+          (projectile-command-history-ignore-duplicates t)
+          ;; history is based on the project root, so we set it to a random
+          ;; path to ensure there are no existing commands in history
+          (projectile-project-root "/a/random/path"))
+      (projectile--run-project-cmd "foo" command-map)
+      (projectile--run-project-cmd "foo" command-map)
+      (projectile--run-project-cmd "bar" command-map)
+      (projectile--run-project-cmd "foo" command-map)
+      (expect 'projectile-run-compilation :to-have-been-called-times 4)
+      (expect (ring-elements
+               (projectile--get-command-history projectile-project-root))
+              :to-equal '("foo" "bar" "foo"))))
+
+  (it "projectile-command-history-ignore-duplicates set to erase"
+    (let ((command-map (make-hash-table :test 'equal))
+          (projectile-command-history-ignore-duplicates 'erase)
+          (projectile-project-root "/a/random/path"))
+      (projectile--run-project-cmd "foo" command-map)
+      (projectile--run-project-cmd "bar" command-map)
+      (projectile--run-project-cmd "foo" command-map)
+      (projectile--run-project-cmd "foo" command-map)
+      (expect 'projectile-run-compilation :to-have-been-called-times 4)
+      (expect (ring-elements
+               (projectile--get-command-history projectile-project-root))
+              :to-equal '("foo" "bar"))))
+
+  (it "keeps a separate history per command type without bleeding"
+    (let ((command-map (make-hash-table :test 'equal))
+          (projectile-command-history-ignore-duplicates t)
+          (projectile-project-command-history (make-hash-table :test 'equal))
+          (projectile-project-root "/a/random/path"))
+      (projectile--run-project-cmd "make" command-map :command-type 'compile)
+      (projectile--run-project-cmd "make test" command-map :command-type 'test)
+      (projectile--run-project-cmd "make check" command-map :command-type 'test)
+      ;; per-type histories stay distinct
+      (expect (ring-elements
+               (projectile--get-command-history projectile-project-root 'compile))
+              :to-equal '("make"))
+      (expect (ring-elements
+               (projectile--get-command-history projectile-project-root 'test))
+              :to-equal '("make check" "make test"))
+      ;; the combined history still records every command, so
+      ;; projectile-repeat-last-command keeps working across types
+      (expect (ring-elements
+               (projectile--get-command-history projectile-project-root))
+              :to-equal '("make check" "make test" "make"))))
+
+  (it "does not record a per-type history when command-type is nil"
+    (let ((command-map (make-hash-table :test 'equal))
+          (projectile-command-history-ignore-duplicates t)
+          (projectile-project-command-history (make-hash-table :test 'equal))
+          (projectile-project-root "/a/random/path"))
+      (projectile--run-project-cmd "foo" command-map)
+      (expect (ring-elements
+               (projectile--get-command-history projectile-project-root))
+              :to-equal '("foo"))
+      (expect (ring-elements
+               (projectile--get-command-history projectile-project-root 'compile))
+              :to-equal '()))))
+
+(describe "command history shared across checkouts (#1786)"
+  (defun projectile-history-test--record (root command)
+    "Put COMMAND into ROOT's `compile' command history."
+    (ring-insert (projectile--get-command-history root 'compile) command))
+
+  (defun projectile-history-test--commands (root)
+    "Return ROOT's `compile' command history as a list."
+    (ring-elements (projectile--get-command-history root 'compile)))
+
+  (it "gives the worktrees of one repository a single history"
+    ;; The point of the issue: pressing M-p in a worktree made this morning
+    ;; offers the commands the project is actually built with.
+    (projectile-test-with-sandbox
+     (let* ((repo (projectile-test-init-git-repo "repo"))
+            (worktree (projectile-test-add-git-worktree
+                       repo (expand-file-name "feature") "feature"))
+            (projectile-project-command-history (make-hash-table :test 'equal)))
+       (projectile-history-test--record repo "make test")
+       (expect (projectile-history-test--commands worktree)
+               :to-equal '("make test")))))
+
+  (it "gives two clones of one upstream a single history"
+    (projectile-test-with-sandbox
+     (let* ((remote "git@github.com:bbatsov/projectile.git")
+            (one (projectile-test-init-git-repo "one" remote))
+            (two (projectile-test-init-git-repo "two" remote))
+            (projectile-project-command-history (make-hash-table :test 'equal)))
+       (projectile-history-test--record one "make test")
+       (expect (projectile-history-test--commands two)
+               :to-equal '("make test")))))
+
+  (it "keeps unrelated projects apart"
+    (projectile-test-with-sandbox
+     (let* ((one (projectile-test-init-git-repo
+                  "one" "git@github.com:bbatsov/projectile.git"))
+            (other (projectile-test-init-git-repo
+                    "other" "git@github.com:bbatsov/crux.git"))
+            (projectile-project-command-history (make-hash-table :test 'equal)))
+       (projectile-history-test--record one "make test")
+       (expect (projectile-history-test--commands other) :to-equal nil))))
+
+  (it "does not share what projectile-repeat-last-command replays"
+    ;; The combined history is replayed without asking, so it stays this
+    ;; checkout's own however widely the browsable history is shared - a
+    ;; command typed elsewhere can carry absolute paths back into it.
+    (projectile-test-with-sandbox
+     (let* ((repo (projectile-test-init-git-repo "repo"))
+            (worktree (projectile-test-add-git-worktree
+                       repo (expand-file-name "feature") "feature"))
+            (projectile-project-command-history (make-hash-table :test 'equal)))
+       (ring-insert (projectile--get-command-history repo) "make -C /abs/path")
+       (expect (ring-elements (projectile--get-command-history worktree))
+               :to-equal nil))))
+
+  (it "keeps a history per root when the scope says so"
+    (projectile-test-with-sandbox
+     (let* ((repo (projectile-test-init-git-repo "repo"))
+            (worktree (projectile-test-add-git-worktree
+                       repo (expand-file-name "feature") "feature"))
+            (projectile-command-history-scope 'project)
+            (projectile-project-command-history (make-hash-table :test 'equal)))
+       (projectile-history-test--record repo "make test")
+       (expect (projectile-history-test--commands worktree) :to-equal nil))))
+
+  (it "still separates the per-type histories of a shared repository"
+    (projectile-test-with-sandbox
+     (let* ((repo (projectile-test-init-git-repo "repo"))
+            (worktree (projectile-test-add-git-worktree
+                       repo (expand-file-name "feature") "feature"))
+            (projectile-project-command-history (make-hash-table :test 'equal)))
+       (ring-insert (projectile--get-command-history repo 'compile) "make")
+       (ring-insert (projectile--get-command-history repo 'test) "make test")
+       (expect (ring-elements
+                (projectile--get-command-history worktree 'compile))
+               :to-equal '("make"))
+       (expect (ring-elements
+                (projectile--get-command-history worktree 'test))
+               :to-equal '("make test")))))
+
+  (it "adopts a history saved under the old per-root key"
+    ;; The per-type histories are persisted, so upgrading must not walk into
+    ;; a project you have been building for years with nothing in hand.
+    (projectile-test-with-sandbox
+     (let* ((repo (projectile-test-init-git-repo
+                   "repo" "git@github.com:bbatsov/projectile.git"))
+            (projectile-project-command-history (make-hash-table :test 'equal))
+            (saved (make-ring 16)))
+       (ring-insert saved "make from before the upgrade")
+       (puthash (cons repo 'compile) saved projectile-project-command-history)
+       (expect (projectile-history-test--commands repo)
+               :to-equal '("make from before the upgrade"))
+       ;; and it moved, rather than being left behind as a second copy
+       (expect (gethash (cons repo 'compile) projectile-project-command-history)
+               :to-be nil))))
+
+  (it "falls back to the project root when there's no repository to key on"
+    (spy-on 'projectile-repo-identity)
+    (expect (projectile--command-history-key "/src/plain/")
+            :to-equal "/src/plain/"))
+
+  (it "prefers the upstream, which relates clones as well as worktrees"
+    (spy-on 'projectile-repo-identity
+            :and-return-value '(:repo "/src/one/.git/" :remote "host/o/r"))
+    (expect (projectile--command-history-key "/src/one/") :to-equal "host/o/r"))
+
+  (it "falls back to the shared directory for a repository with no upstream"
+    (spy-on 'projectile-repo-identity
+            :and-return-value '(:repo "/src/one/.git/" :remote nil))
+    (expect (projectile--command-history-key "/src/one/")
+            :to-equal "/src/one/.git/")))
+
+(describe "projectile-default-generic-command"
+  (it "returns a string command as-is"
+    (let ((projectile-project-types '((test-type compile-command "make"))))
+      (expect (projectile-default-generic-command 'test-type 'compile-command) :to-equal "make")))
+  (it "calls a function symbol and returns its result"
+    (let ((projectile-project-types '((test-type compile-command my-compile-fn))))
+      (spy-on 'my-compile-fn :and-return-value "custom-build")
+      (expect (projectile-default-generic-command 'test-type 'compile-command) :to-equal "custom-build")))
+  (it "calls a lambda command and returns its result"
+    (let ((projectile-project-types
+           `((test-type compile-command ,(lambda () "lambda-build")))))
+      (expect (projectile-default-generic-command 'test-type 'compile-command) :to-equal "lambda-build")))
+  (it "returns nil for missing command"
+    (let ((projectile-project-types '((test-type))))
+      (expect (projectile-default-generic-command 'test-type 'compile-command) :to-equal nil))))
+
+(describe "function-valued lifecycle commands"
+  ;; #1549 / #1676: a project type can register a lifecycle command as a
+  ;; function (e.g. CMake's preset pickers, or a user's own :run/:test
+  ;; function).  It must be re-invoked - and may prompt - on every run rather
+  ;; than being frozen once its first result lands in the command cache.
+  (before-each
+    (spy-on 'projectile-run-compilation)
+    (spy-on 'file-directory-p :and-return-value t)
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-root :and-return-value "/proj/")
+    (spy-on 'projectile-compilation-dir :and-return-value "/proj/")
+    (spy-on 'projectile-project-name :and-return-value "proj"))
+
+  (it "re-invokes a function :run command each run and never caches it"
+    (let ((projectile-project-types projectile-project-types)
+          (projectile-run-cmd-map (make-hash-table :test 'equal))
+          (projectile-project-run-cmd nil)
+          (projectile-compilation-buffer-scope nil)
+          (compilation-read-command nil))
+      (defun projectile-test--dyn-run () "run-it")
+      (projectile-register-project-type 'dyn-run-project '("dyn.marker")
+                                        :run 'projectile-test--dyn-run)
+      (spy-on 'projectile-project-type :and-return-value 'dyn-run-project)
+      (spy-on 'projectile-test--dyn-run :and-call-through)
+      (projectile-run-project nil)
+      (projectile-run-project nil)
+      ;; the function is consulted on BOTH runs...
+      (expect 'projectile-test--dyn-run :to-have-been-called-times 2)
+      ;; ...and nothing is frozen in the run-command cache
+      (expect (hash-table-count projectile-run-cmd-map) :to-equal 0)
+      (expect 'projectile-run-compilation :to-have-been-called-with "run-it" nil)))
+
+  (it "re-runs CMake preset selection on every configure"
+    (let ((projectile-configure-cmd-map (make-hash-table :test 'equal))
+          (projectile-project-configure-cmd nil)
+          (projectile-compilation-buffer-scope nil)
+          (compilation-read-command nil))
+      (spy-on 'projectile-project-type :and-return-value 'cmake)
+      (spy-on 'projectile--cmake-select-command
+              :and-return-value projectile--cmake-no-preset)
+      (projectile-configure-project nil)
+      (projectile-configure-project nil)
+      ;; the preset picker runs on each configure, not just the first
+      (expect 'projectile--cmake-select-command :to-have-been-called-times 2)
+      (expect (hash-table-count projectile-configure-cmd-map) :to-equal 0)))
+
+  ;; #2097: not caching a function-derived command also threw away a command
+  ;; the user had edited at the prompt, so every run offered the function's
+  ;; answer again and the edit had to be redone each time.
+  (it "remembers a command edited at the prompt (#2097)"
+    (let ((projectile-project-types projectile-project-types)
+          (projectile-compilation-cmd-map (make-hash-table :test 'equal))
+          (projectile-project-compilation-cmd nil)
+          (projectile-compilation-buffer-scope nil))
+      (defun projectile-test--dyn-compile () "cmake --build build")
+      (projectile-register-project-type 'dyn-compile-project '("dyn.marker")
+                                        :compile 'projectile-test--dyn-compile)
+      (spy-on 'projectile-project-type :and-return-value 'dyn-compile-project)
+      ;; the user edits the offered command
+      (spy-on 'projectile-maybe-read-command
+              :and-return-value "cmake --build build -j8")
+      (projectile-compile-project nil)
+      (expect (gethash "/proj/" projectile-compilation-cmd-map)
+              :to-equal "cmake --build build -j8")
+      ;; ...so it's what the next invocation offers, function or no function
+      (expect (projectile-compilation-command "/proj/")
+              :to-equal "cmake --build build -j8")))
+
+  (it "still doesn't cache a function's own answer when it's accepted as-is (#1676)"
+    (let ((projectile-project-types projectile-project-types)
+          (projectile-compilation-cmd-map (make-hash-table :test 'equal))
+          (projectile-project-compilation-cmd nil)
+          (projectile-compilation-buffer-scope nil))
+      (defun projectile-test--dyn-compile2 () "cmake --build build")
+      (projectile-register-project-type 'dyn-compile-project-2 '("dyn.marker")
+                                        :compile 'projectile-test--dyn-compile2)
+      (spy-on 'projectile-project-type :and-return-value 'dyn-compile-project-2)
+      ;; the user accepts what the function produced
+      (spy-on 'projectile-maybe-read-command
+              :and-call-fake (lambda (_arg default &rest _) default))
+      (projectile-compile-project nil)
+      (expect (hash-table-count projectile-compilation-cmd-map) :to-equal 0))))
+
+(describe "projectile-compilation-buffer-name"
+  ;; #1867: compile, test and run all use compilation-mode, so within a
+  ;; project they shared one buffer and each run discarded the last one's
+  ;; output.
+  (before-each
+    (spy-on 'projectile-project-p :and-return-value t)
+    (spy-on 'projectile-project-name :and-return-value "my-project"))
+
+  (it "is the plain compilation buffer when the scope is empty"
+    (let ((projectile-compilation-buffer-scope nil)
+          (projectile--compilation-command-type 'test))
+      (expect (projectile-compilation-buffer-name "compilation")
+              :to-equal "*compilation*")))
+
+  (it "still honors the obsolete per-project boolean"
+    (let ((projectile-compilation-buffer-scope nil)
+          (projectile-per-project-compilation-buffer t)
+          (projectile--compilation-command-type 'test))
+      (expect (projectile-compilation-buffer-name "compilation")
+              :to-equal "*compilation*<my-project>")))
+
+  (it "still honors the obsolete per-command boolean"
+    (let ((projectile-compilation-buffer-scope nil)
+          (projectile-per-command-compilation-buffer t)
+          (projectile--compilation-command-type 'test))
+      (expect (projectile-compilation-buffer-name "compilation")
+              :to-equal "*compilation*<test>")))
+
+  (it "reads t as naming both aspects"
+    (let ((projectile-compilation-buffer-scope t)
+          (projectile--compilation-command-type 'compile))
+      (expect (projectile-compilation-buffer-name "compilation")
+              :to-equal "*compilation*<my-project:compile>")))
+
+  (it "does not repeat an aspect the obsolete boolean also asks for"
+    (let ((projectile-compilation-buffer-scope '(project))
+          (projectile-per-project-compilation-buffer t)
+          (projectile--compilation-command-type 'test))
+      (expect (projectile-compilation-buffer-name "compilation")
+              :to-equal "*compilation*<my-project>")))
+
+  (it "qualifies by project"
+    (let ((projectile-compilation-buffer-scope '(project))
+          (projectile--compilation-command-type 'test))
+      (expect (projectile-compilation-buffer-name "compilation")
+              :to-equal "*compilation*<my-project>")))
+
+  (it "qualifies by command type"
+    (let ((projectile-compilation-buffer-scope '(command))
+          (projectile--compilation-command-type 'test))
+      (expect (projectile-compilation-buffer-name "compilation")
+              :to-equal "*compilation*<test>")))
+
+  (it "qualifies by both, project first"
+    (let ((projectile-compilation-buffer-scope '(project command))
+          (projectile--compilation-command-type 'compile))
+      (expect (projectile-compilation-buffer-name "compilation")
+              :to-equal "*compilation*<my-project:compile>")))
+
+  (it "omits the command type when there isn't one"
+    (let ((projectile-compilation-buffer-scope '(command))
+          (projectile--compilation-command-type nil))
+      (expect (projectile-compilation-buffer-name "compilation")
+              :to-equal "*compilation*"))))
+
+(describe "per-command compilation buffers (#1867)"
+  (before-each
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-p :and-return-value t)
+    (spy-on 'projectile-project-name :and-return-value "my-project")
+    (spy-on 'projectile-compilation-dir :and-return-value "/proj/")
+    (spy-on 'file-directory-p :and-return-value t)
+    (spy-on 'projectile-maybe-read-command :and-call-fake
+            (lambda (_arg default &rest _) default)))
+
+  (it "sends compile and test output to different buffers"
+    (let ((projectile-compilation-buffer-scope '(command))
+          names)
+      (spy-on 'projectile-run-compilation :and-call-fake
+              (lambda (&rest _)
+                (push (funcall compilation-buffer-name-function "compilation") names)))
+      (projectile--run-project-cmd "make" nil :command-type 'compile)
+      (projectile--run-project-cmd "make test" nil :command-type 'test)
+      (expect (nreverse names)
+              :to-equal '("*compilation*<compile>" "*compilation*<test>"))))
+
+  (it "leaves them sharing a buffer when the option is off"
+    (let ((projectile-compilation-buffer-scope '(project))
+          names)
+      (spy-on 'projectile-run-compilation :and-call-fake
+              (lambda (&rest _)
+                (push (funcall compilation-buffer-name-function "compilation") names)))
+      (projectile--run-project-cmd "make" nil :command-type 'compile)
+      (projectile--run-project-cmd "make test" nil :command-type 'test)
+      (expect (nreverse names)
+              :to-equal '("*compilation*<my-project>" "*compilation*<my-project>")))))
+
+(describe "display-variant commands"
+  ;; The other-window/-frame variants share a helper and differ only in the
+  ;; display function they hand off to.
+  (it "projectile-dired opens the project root with dired"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'dired)
+    (projectile-dired)
+    (expect 'dired :to-have-been-called-with "/proj/"))
+
+  (it "projectile-dired-other-window uses dired-other-window"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'dired-other-window)
+    (projectile-dired-other-window)
+    (expect 'dired-other-window :to-have-been-called-with "/proj/"))
+
+  (it "projectile-switch-to-buffer-other-frame uses switch-to-buffer-other-frame"
+    (spy-on 'projectile-read-buffer-to-switch :and-return-value "buf")
+    (spy-on 'switch-to-buffer-other-frame)
+    (projectile-switch-to-buffer-other-frame)
+    (expect 'switch-to-buffer-other-frame :to-have-been-called-with "buf"))
+
+  (it "projectile-find-implementation-or-test-other-window uses find-file-other-window"
+    (spy-on 'buffer-file-name :and-return-value "/proj/x_test.el")
+    (spy-on 'projectile-find-implementation-or-test :and-return-value "/proj/x.el")
+    (spy-on 'find-file-other-window)
+    (projectile-find-implementation-or-test-other-window)
+    (expect 'find-file-other-window :to-have-been-called-with "/proj/x.el"))
+
+  ;; The variants are generated by `projectile--define-display-variants':
+  ;; the -other-frame body is derived from the -other-window one by symbol
+  ;; substitution, so check a generated pair end to end.
+  (it "the generated find-file variants hand the right ff-variant to the helper"
+    (spy-on 'projectile--find-file)
+    (projectile-find-file-other-window)
+    (expect 'projectile--find-file :to-have-been-called-with nil #'find-file-other-window)
+    (projectile-find-file-other-frame '(4))
+    (expect 'projectile--find-file :to-have-been-called-with '(4) #'find-file-other-frame))
+
+  (it "the generated find-dir variants use the dired display functions"
+    (spy-on 'projectile--find-dir)
+    (projectile-find-dir-other-frame)
+    (expect 'projectile--find-dir :to-have-been-called-with nil #'dired-other-frame))
+
+  (it "the terminal commands get only an other-window variant"
+    (spy-on 'projectile--run)
+    (projectile-run-vterm-other-window)
+    (expect 'projectile--run :to-have-been-called-with 'vterm nil t)
+    (expect (fboundp 'projectile-run-vterm-other-frame) :to-be nil)
+    (expect (fboundp 'projectile-run-eat-other-frame) :to-be nil)
+    (expect (fboundp 'projectile-run-ghostel-other-frame) :to-be nil))
+
+  (it "every shell backend has an other-window command that asks for one"
+    ;; The built-in shells used to ignore the flag, so only the three
+    ;; package-backed terminals had a variant at all.
+    (spy-on 'projectile--run)
+    (dolist (backend '(shell eshell ielm term vterm eat ghostel))
+      (let ((cmd (intern (format "projectile-run-%s-other-window" backend))))
+        (expect (commandp cmd) :to-be-truthy)
+        (funcall cmd)
+        (expect 'projectile--run :to-have-been-called-with backend nil t))))
+
+  (it "projectile-run itself gets one, dispatching through the configured backend"
+    (spy-on 'projectile--run)
+    (let ((projectile-shell-backend 'eshell))
+      (projectile-run-other-window)
+      (expect 'projectile--run :to-have-been-called-with 'eshell nil t)))
+
+  (it "the generated variants are interactive and take the prefix argument"
+    (expect (commandp #'projectile-find-file-other-window) :to-be-truthy)
+    (expect (interactive-form 'projectile-find-file-other-frame)
+            :to-equal '(interactive "P"))
+    (expect (cadr (interactive-form 'projectile-switch-to-buffer-other-window))
+            :to-be nil)))
+
+(describe "projectile--displaying-in-other-window"
+  ;; `shell', `eshell' and `ielm' display their own buffer and have no
+  ;; `-other-window' flavour to call, so the flag is honoured by overriding
+  ;; the display action they pass rather than by picking a different command.
+  (it "redirects a same-window pop into another window"
+    (let ((buf (get-buffer-create " *projectile-ow-probe*")))
+      (unwind-protect
+          (save-current-buffer
+            (save-window-excursion
+              (delete-other-windows)
+              (projectile--displaying-in-other-window t
+                (pop-to-buffer-same-window buf))
+              (expect (> (length (window-list)) 1) :to-be-truthy)
+              (expect (window-buffer) :to-be buf)))
+        (kill-buffer buf))))
+
+  (it "leaves the display alone when the flag is off"
+    (let ((buf (get-buffer-create " *projectile-ow-probe*")))
+      (unwind-protect
+          (save-current-buffer
+            (save-window-excursion
+              (delete-other-windows)
+              (projectile--displaying-in-other-window nil
+                (pop-to-buffer-same-window buf))
+              (expect (length (window-list)) :to-equal 1)))
+        (kill-buffer buf)))))
+
+(describe "projectile-other-window-command"
+  ;; Tear down whatever the prefix command armed (the display override
+  ;; and, on Emacs 28, Projectile's switch-to-buffer shim) the way the
+  ;; command loop would after the next command.
+  (after-each
+    (let ((this-command 'ignore))
+      (run-hooks 'pre-command-hook)
+      (run-hooks 'post-command-hook)))
+
+  (it "arms the display-buffer override and the Projectile transient map"
+    (spy-on 'other-window-prefix)
+    (spy-on 'set-transient-map)
+    (call-interactively #'projectile-other-window-command)
+    (expect 'other-window-prefix :to-have-been-called)
+    (expect 'set-transient-map :to-have-been-called-with projectile-command-map))
+
+  (it "keeps the Projectile keys active for the next key sequence"
+    (spy-on 'other-window-prefix)
+    (call-interactively #'projectile-other-window-command)
+    (unwind-protect
+        (progn
+          (expect (key-binding (kbd "f")) :to-be #'projectile-find-file)
+          ;; ...including commands that never had -other-window variants.
+          (expect (key-binding (kbd "x s")) :to-be #'projectile-run-shell))
+      ;; Deactivate the transient map the way the command loop would.
+      (let ((this-command 'ignore))
+        (run-hooks 'pre-command-hook)))
+    (expect (key-binding (kbd "f")) :not :to-be #'projectile-find-file))
+
+  (it "displays the next command's buffer in another window, once"
+    ;; Real `other-window-prefix'; only the transient map is stubbed out.
+    (spy-on 'set-transient-map)
+    (delete-other-windows)
+    (let ((start-window (selected-window))
+          (obey-display switch-to-buffer-obey-display-actions)
+          (buf (get-buffer-create "projectile-other-window-test")))
+      (unwind-protect
+          (progn
+            (call-interactively #'projectile-other-window-command)
+            ;; Run the next "command"; even a `switch-to-buffer'-based one
+            ;; gets the other-window treatment (on Emacs 28 via
+            ;; Projectile's own shim, on 29+ via window.el itself).
+            (let ((this-command 'projectile-switch-to-buffer))
+              (switch-to-buffer buf)
+              ;; Let the "command loop" finish so the exit functions run.
+              (run-hooks 'post-command-hook))
+            (expect (length (window-list)) :to-equal 2)
+            (expect (selected-window) :not :to-be start-window)
+            (expect (window-buffer) :to-be buf)
+            ;; The override is single-shot and restores the previous state.
+            (expect (car display-buffer-overriding-action) :to-equal nil)
+            (expect switch-to-buffer-obey-display-actions :to-be obey-display))
+        (kill-buffer buf)
+        (delete-other-windows)))))
+
+(describe "projectile-other-frame-command"
+  (after-each
+    (let ((this-command 'ignore))
+      (run-hooks 'pre-command-hook)
+      (run-hooks 'post-command-hook)))
+
+  (it "arms the display-buffer override and the Projectile transient map"
+    (spy-on 'other-frame-prefix)
+    (spy-on 'set-transient-map)
+    (call-interactively #'projectile-other-frame-command)
+    (expect 'other-frame-prefix :to-have-been-called)
+    (expect 'set-transient-map :to-have-been-called-with projectile-command-map)))
+
+(describe "projectile--run-project-cmd %p substitution"
+  (it "replaces %p with the project name before running the command"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-compilation-dir :and-return-value temporary-file-directory)
+    (spy-on 'projectile-maybe-read-command :and-call-fake (lambda (_show cmd &rest _) cmd))
+    (spy-on 'projectile-project-name :and-return-value "myproj")
+    (spy-on 'projectile-run-compilation)
+    (projectile--run-project-cmd "make -C %p build" nil)
+    (expect 'projectile-run-compilation
+            :to-have-been-called-with "make -C myproj build" nil))
+
+  (it "leaves a command without %p untouched"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-compilation-dir :and-return-value temporary-file-directory)
+    (spy-on 'projectile-maybe-read-command :and-call-fake (lambda (_show cmd &rest _) cmd))
+    (spy-on 'projectile-project-name :and-return-value "myproj")
+    (spy-on 'projectile-run-compilation)
+    (projectile--run-project-cmd "make build" nil)
+    (expect 'projectile-run-compilation
+            :to-have-been-called-with "make build" nil)))
+
+(describe "projectile--subproject-markers"
+  (it "derives the markers from the registered project types"
+    (let ((projectile-subproject-markers nil))
+      (expect (member "Cargo.toml" (projectile--subproject-markers)) :to-be-truthy)
+      (expect (member "package.json" (projectile--subproject-markers)) :to-be-truthy)
+      (expect (member "go.mod" (projectile--subproject-markers)) :to-be-truthy)))
+
+  (it "leaves out wildcard patterns and names with a directory component"
+    (let ((projectile-subproject-markers nil))
+      (expect (seq-find (lambda (m) (string-match-p "[*?]" m))
+                        (projectile--subproject-markers))
+              :to-be nil)
+      (expect (member "debian/control" (projectile--subproject-markers)) :to-be nil)))
+
+  (it "honors an explicit list"
+    (let ((projectile-subproject-markers '("only.this")))
+      (expect (projectile--subproject-markers) :to-equal '("only.this")))))
+
+(describe "projectile-subproject-root"
+  (it "returns the nearest ancestor directory that holds a project marker"
+    (let* ((root (file-name-as-directory (make-temp-file "projectile-sub" t)))
+           (sub (file-name-as-directory (expand-file-name "mod" root)))
+           (deep (file-name-as-directory (expand-file-name "src" sub))))
+      (unwind-protect
+          (progn
+            (make-directory deep t)
+            (write-region "" nil (expand-file-name "pom.xml" root))
+            (write-region "" nil (expand-file-name "pom.xml" sub))
+            (spy-on 'projectile-acquire-root :and-return-value root)
+            (let ((default-directory deep))
+              (expect (projectile-subproject-root) :to-equal sub)))
+        (delete-directory root t))))
+
+  (it "recognizes a subproject of a different kind than the project itself"
+    ;; A polyglot monorepo: the manifest of the part you're in counts,
+    ;; whatever the type of the repository as a whole is.
+    (let* ((root (file-name-as-directory (make-temp-file "projectile-sub" t)))
+           (sub (file-name-as-directory (expand-file-name "crates/parser" root)))
+           (deep (file-name-as-directory (expand-file-name "src" sub))))
+      (unwind-protect
+          (progn
+            (make-directory deep t)
+            (write-region "" nil (expand-file-name "package.json" root))
+            (write-region "" nil (expand-file-name "Cargo.toml" sub))
+            (spy-on 'projectile-acquire-root :and-return-value root)
+            (let ((default-directory deep))
+              (expect (projectile-subproject-root) :to-equal sub)))
+        (delete-directory root t))))
+
+  (it "falls back to the project root when only the root holds a marker"
+    (let* ((root (file-name-as-directory (make-temp-file "projectile-sub" t)))
+           (sub (file-name-as-directory (expand-file-name "mod" root)))
+           (deep (file-name-as-directory (expand-file-name "src" sub))))
+      (unwind-protect
+          (progn
+            (make-directory deep t)
+            (write-region "" nil (expand-file-name "pom.xml" root))
+            (spy-on 'projectile-acquire-root :and-return-value root)
+            (let ((default-directory deep))
+              (expect (projectile-subproject-root) :to-equal root)))
+        (delete-directory root t))))
+
+  (it "errors when there is no marker up to the project root"
+    (let* ((root (file-name-as-directory (make-temp-file "projectile-sub" t)))
+           (deep (file-name-as-directory (expand-file-name "mod/src" root))))
+      (unwind-protect
+          (progn
+            (make-directory deep t)
+            (spy-on 'projectile-acquire-root :and-return-value root)
+            (let ((default-directory deep))
+              (expect (projectile-subproject-root) :to-throw 'user-error)))
+        (delete-directory root t)))))
+
+(describe "projectile-project-subprojects"
+  (it "lists the directories below the root that hold a manifest"
+    (spy-on 'projectile-project-files :and-return-value
+            '("README.md"
+              "package.json"
+              "crates/parser/Cargo.toml"
+              "crates/parser/src/lib.rs"
+              "services/api/go.mod"
+              "services/api/main.go"
+              "docs/index.md"))
+    (expect (projectile-project-subprojects "/proj/")
+            :to-equal '("crates/parser/" "services/api/")))
+
+  (it "does not count the project's own manifest as a subproject"
+    (spy-on 'projectile-project-files :and-return-value '("Cargo.toml" "src/main.rs"))
+    (expect (projectile-project-subprojects "/proj/") :to-be nil))
+
+  (it "reports a directory once, however many manifests it holds"
+    (spy-on 'projectile-project-files :and-return-value
+            '("app/package.json" "app/Cargo.toml" "app/Makefile"))
+    (expect (projectile-project-subprojects "/proj/") :to-equal '("app/")))
+
+  (it "honors an explicit marker list"
+    (spy-on 'projectile-project-files :and-return-value
+            '("crates/parser/Cargo.toml" "web/package.json"))
+    (let ((projectile-subproject-markers '("Cargo.toml")))
+      (expect (projectile-project-subprojects "/proj/") :to-equal '("crates/parser/")))))
+
+(describe "projectile-subprojects-from-manifest"
+  (it "reads the members a pnpm workspace declares"
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/packages/core/" "repo/packages/runtime/" "repo/tools/scratch/")
+        (with-temp-file "repo/pnpm-workspace.yaml"
+          (insert "packages:\n  - 'packages/*'\n\ncatalog:\n  vite: ^8.0.0\n"))
+        (let ((repo (file-truename (expand-file-name "repo/"))))
+          ;; `tools/scratch/' is not a member, and the `catalog:' key that
+          ;; follows the list must not be read as one either
+          (expect (projectile-subprojects-from-manifest repo)
+                  :to-equal '("packages/core/" "packages/runtime/"))))))
+
+  (it "reads the workspaces a package.json declares, globs and literals alike"
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/packages/a/" "repo/packages/b/" "repo/benchmark/" "repo/other/")
+        (with-temp-file "repo/package.json"
+          (insert "{\"workspaces\": [\"packages/*\", \"benchmark\"]}"))
+        (let ((repo (file-truename (expand-file-name "repo/"))))
+          (expect (projectile-subprojects-from-manifest repo)
+                  :to-equal '("benchmark/" "packages/a/" "packages/b/"))))))
+
+  (it "drops the crates a Cargo workspace excludes"
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/core/" "repo/util/" "repo/fuzz/")
+        (with-temp-file "repo/Cargo.toml"
+          (insert "[workspace]\nmembers = [\n  \"core\",\n  # internal\n  \"util\",\n]\n"
+                  "exclude = [\"fuzz\"]\n"))
+        (let ((repo (file-truename (expand-file-name "repo/"))))
+          ;; the comment inside the array is not a member, and `fuzz' is
+          ;; deliberately kept out of the workspace
+          (expect (projectile-subprojects-from-manifest repo)
+                  :to-equal '("core/" "util/"))))))
+
+  (it "reads the modules a Go workspace puts to use"
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/api/" "repo/worker/" "repo/scratch/")
+        (with-temp-file "repo/go.work"
+          (insert "go 1.22\n\nuse (\n\t./api\n\t// not this one\n\t./worker\n)\n"))
+        (let ((repo (file-truename (expand-file-name "repo/"))))
+          ;; the comment inside the block is not a module, and `scratch' is
+          ;; simply not listed
+          (expect (projectile-subprojects-from-manifest repo)
+                  :to-equal '("api/" "worker/"))))))
+
+  (it "reads a single-line Go workspace use directive"
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/only/")
+        (with-temp-file "repo/go.work" (insert "go 1.22\n\nuse ./only\n"))
+        (let ((repo (file-truename (expand-file-name "repo/"))))
+          (expect (projectile-subprojects-from-manifest repo)
+                  :to-equal '("only/"))))))
+
+  (it "has no answer when the members are not declared statically"
+    ;; Gradle builds its module list in a Kotlin program and Bazel in
+    ;; Starlark; neither can be read without running the tool, so the scan
+    ;; has to stay the fallback.
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/settings.gradle.kts" "repo/documentation/build.gradle.kts")
+        (let ((repo (file-truename (expand-file-name "repo/"))))
+          (expect (projectile-subprojects-from-manifest repo) :to-be nil))))))
+
+(describe "projectile-project-subprojects"
+  (it "prefers the declared members over a scan for manifests"
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/.projectile" "repo/packages/a/package.json"
+           "repo/test/fixtures/broken/package.json")
+        (with-temp-file "repo/package.json"
+          (insert "{\"workspaces\": [\"packages/*\"]}"))
+        (let ((repo (file-truename (expand-file-name "repo/")))
+              (projectile-indexing-method 'native)
+              (projectile-projects-cache (make-hash-table :test 'equal))
+              (projectile-projects-cache-time (make-hash-table :test 'equal))
+              (projectile-enable-caching nil))
+          (spy-on 'projectile-project-root :and-return-value repo)
+          ;; the fixture carries a package.json but is not a member
+          (expect (projectile-project-subprojects repo)
+                  :to-equal '("packages/a/"))
+          (expect (projectile-subprojects-from-scan repo)
+                  :to-contain "test/fixtures/broken/")))))
+
+  (it "falls back to scanning when nothing declares the members"
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/.projectile" "repo/settings.gradle.kts"
+           "repo/mod/pom.xml")
+        (let ((repo (file-truename (expand-file-name "repo/")))
+              (projectile-indexing-method 'native)
+              (projectile-projects-cache (make-hash-table :test 'equal))
+              (projectile-projects-cache-time (make-hash-table :test 'equal))
+              (projectile-enable-caching nil))
+          (spy-on 'projectile-project-root :and-return-value repo)
+          (expect (projectile-project-subprojects repo) :to-equal '("mod/")))))))
+
+(describe "projectile-find-file-in-subproject"
+  (it "completes over just the chosen subproject's files, from the project's listing"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-subprojects :and-return-value '("app/" "lib/"))
+    (spy-on 'projectile-project-files :and-return-value
+            '("app/main.js" "lib/util.js" "lib/util.test.js" "README.md"))
+    (spy-on 'find-file)
+    (let (offered)
+      (spy-on 'projectile-completing-read :and-call-fake
+              (lambda (prompt choices &rest _)
+                (if (string-prefix-p "Subproject" prompt)
+                    "lib/"
+                  (setq offered choices)
+                  "lib/util.js")))
+      (projectile-find-file-in-subproject)
+      ;; only the subproject's files, and the project is indexed once
+      (expect offered :to-equal '("lib/util.js" "lib/util.test.js"))
+      (expect 'find-file :to-have-been-called-with "/proj/lib/util.js")))
+
+  (it "errors when the project has no subprojects"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-subprojects :and-return-value nil)
+    (expect (projectile-find-file-in-subproject) :to-throw 'user-error)))
+
+(describe "projectile-compilation-dir"
+  (before-each
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-type :and-return-value 'meson))
+
+  (it "resolves the project type's compilation dir against the project root"
+    (expect (projectile-compilation-dir) :to-equal "/proj/build/"))
+
+  (it "resolves it against a base directory when given one"
+    ;; The subproject case: a Meson module builds in its own build
+    ;; directory, not the repository's.
+    (expect (projectile-compilation-dir "/proj/sub/") :to-equal "/proj/sub/build/"))
+
+  (it "returns the base itself for a type without a compilation dir"
+    (spy-on 'projectile-project-type :and-return-value 'rust-cargo)
+    (expect (projectile-compilation-dir "/proj/sub/") :to-equal "/proj/sub/")
+    (expect (projectile-compilation-dir) :to-equal "/proj/")))
+
+(describe "projectile-subproject-type"
+  (it "gives a member of a different toolchain its own type"
+    ;; A Rust crate inside a JavaScript monorepo is a Rust crate.  Before
+    ;; this, every member inherited the repository's type, so `c m t' in the
+    ;; crate ran the repository's `npm test'.
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/.projectile" "repo/package.json"
+           "repo/crates/engine/Cargo.toml")
+        (let* ((repo (file-truename (expand-file-name "repo/")))
+               (member (expand-file-name "crates/engine/" repo)))
+          (let ((default-directory member))
+            (expect (projectile-subproject-type member) :to-equal 'rust-cargo))))))
+
+  (it "keeps the repository's type when the member is the same kind of project"
+    ;; A pnpm workspace member holds only a `package.json', so on its own it
+    ;; reads as plain `node' - and `npm test' inside a pnpm workspace is
+    ;; worse than what the repository would have run.
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/.projectile" "repo/package.json" "repo/pnpm-lock.yaml"
+           "repo/packages/core/package.json")
+        (let* ((repo (file-truename (expand-file-name "repo/")))
+               (member (expand-file-name "packages/core/" repo)))
+          (let ((default-directory member))
+            (expect (projectile-project-type repo) :to-equal 'pnpm)
+            (expect (projectile-subproject-type member) :to-equal 'pnpm))))))
+
+  (it "detects a member whose type identifies itself with a predicate"
+    ;; `go', `make', `terraform' and eight other types use a function marker
+    ;; instead of a list of file names, and those predicates resolve paths
+    ;; through `projectile-expand-root', which walks up to the repository.
+    ;; Without pinning the root the member would be asked whether the *repo*
+    ;; has a go.mod.
+    (projectile-test-with-sandbox
+      (projectile-test-with-files
+          ("repo/.projectile" "repo/package.json" "repo/services/api/go.mod")
+        (let* ((repo (file-truename (expand-file-name "repo/")))
+               (member (expand-file-name "services/api/" repo)))
+          (let ((default-directory member))
+            (expect (projectile-subproject-type member) :to-equal 'go)))))))
+
+(describe "the subproject lifecycle commands"
+  (before-each
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-subproject-root :and-return-value "/proj/services/api/")
+    (spy-on 'projectile-project-type :and-return-value 'rust-cargo)
+    (spy-on 'projectile--cache-project-commands-p :and-return-value nil))
+
+  (it "runs the phase's command in the subproject"
+    (spy-on 'projectile-run-command :and-return-value "cargo run")
+    (let (args)
+      (spy-on 'projectile--run-project-cmd :and-call-fake
+              (lambda (command _map &rest rest) (setq args (cons command rest))))
+      (projectile-run-subproject nil)
+      (expect (car args) :to-equal "cargo run")
+      (expect (plist-get (cdr args) :directory) :to-equal "/proj/services/api/")))
+
+  (it "keeps the project type's compilation dir, relative to the subproject"
+    ;; Regression: this used to replace `projectile-project-compilation-dir'
+    ;; outright, so a Meson module ran ninja in sub/ instead of sub/build/.
+    (spy-on 'projectile-project-type :and-return-value 'meson)
+    (spy-on 'projectile-compilation-command :and-return-value "ninja")
+    (let (args)
+      (spy-on 'projectile--run-project-cmd :and-call-fake
+              (lambda (command _map &rest rest) (setq args (cons command rest))))
+      (projectile-compile-subproject nil)
+      (expect (plist-get (cdr args) :directory) :to-equal "/proj/services/api/build/")))
+
+  (it "says which subproject the command will run in, at the prompt"
+    (spy-on 'projectile-test-command :and-return-value "cargo test")
+    (let (args)
+      (spy-on 'projectile--run-project-cmd :and-call-fake
+              (lambda (command _map &rest rest) (setq args (cons command rest))))
+      (projectile-test-subproject nil)
+      (expect (plist-get (cdr args) :prompt-prefix)
+              :to-equal "Test command in services/api/: ")))
+
+  (it "exists for every lifecycle phase"
+    (dolist (phase '(configure compile test install package run))
+      (expect (commandp (intern (format "projectile-%s-subproject" phase)))
+              :to-be-truthy))))
+
+(describe "projectile-git-changed-files"
+  (defun projectile-changed-test--git (&rest args)
+    (apply #'call-process "git" nil nil nil args))
+
+  (defun projectile-changed-test--init ()
+    (projectile-changed-test--git "init" "-q")
+    (projectile-changed-test--git "config" "user.email" "t@t.dev")
+    (projectile-changed-test--git "config" "user.name" "T"))
+
+  (it "reports staged, unstaged and untracked files"
+    (projectile-test-with-sandbox
+     (projectile-test-with-files
+      ("project/" "project/committed.el" "project/edited.el" "project/staged.el")
+      (let* ((root (projectile-test-project-root))
+             (default-directory root))
+        (projectile-changed-test--init)
+        (projectile-changed-test--git "add" "-A")
+        (projectile-changed-test--git "commit" "-qm" "init")
+        (write-region ";; edited\n" nil "edited.el")
+        (write-region ";; staged\n" nil "staged.el")
+        (projectile-changed-test--git "add" "staged.el")
+        (write-region "" nil "untracked.el")
+        (spy-on 'projectile-project-vcs :and-return-value 'git)
+        (let ((files (projectile-git-changed-files root)))
+          (expect files :to-contain "edited.el")
+          (expect files :to-contain "staged.el")
+          (expect files :to-contain "untracked.el")
+          (expect files :not :to-contain "committed.el"))))))
+
+  (it "reports a rename once, by its new name"
+    (projectile-test-with-sandbox
+     (projectile-test-with-files
+      ("project/" "project/old-name.el")
+      (let* ((root (projectile-test-project-root))
+             (default-directory root))
+        (projectile-changed-test--init)
+        (projectile-changed-test--git "add" "-A")
+        (projectile-changed-test--git "commit" "-qm" "init")
+        (projectile-changed-test--git "mv" "old-name.el" "new-name.el")
+        (spy-on 'projectile-project-vcs :and-return-value 'git)
+        (let ((files (projectile-git-changed-files root)))
+          ;; the source path of a rename must not read as another changed file
+          (expect files :to-equal '("new-name.el")))))))
+
+  (it "lists every file under a new directory, not just the directory"
+    (projectile-test-with-sandbox
+     (projectile-test-with-files
+      ("project/" "project/committed.el")
+      (let* ((root (projectile-test-project-root))
+             (default-directory root))
+        (projectile-changed-test--init)
+        (projectile-changed-test--git "add" "-A")
+        (projectile-changed-test--git "commit" "-qm" "init")
+        (make-directory "fresh" t)
+        (write-region "" nil "fresh/a.el")
+        (write-region "" nil "fresh/b.el")
+        (spy-on 'projectile-project-vcs :and-return-value 'git)
+        (let ((files (projectile-git-changed-files root)))
+          (expect files :to-contain "fresh/a.el")
+          (expect files :to-contain "fresh/b.el"))))))
+
+  (it "compares against a base revision when given one"
+    (projectile-test-with-sandbox
+     (projectile-test-with-files
+      ("project/" "project/base.el")
+      (let* ((root (projectile-test-project-root))
+             (default-directory root))
+        (projectile-changed-test--init)
+        (projectile-changed-test--git "add" "-A")
+        (projectile-changed-test--git "commit" "-qm" "init")
+        (projectile-changed-test--git "branch" "-M" "main")
+        (projectile-changed-test--git "checkout" "-q" "-b" "feature")
+        (write-region ";; changed on the branch\n" nil "base.el")
+        (write-region "" nil "added.el")
+        (projectile-changed-test--git "add" "-A")
+        (projectile-changed-test--git "commit" "-qm" "work")
+        (spy-on 'projectile-project-vcs :and-return-value 'git)
+        (let ((files (projectile-git-changed-files root "main")))
+          (expect files :to-contain "base.el")
+          (expect files :to-contain "added.el"))
+        ;; and with no base, a clean tree has nothing to show
+        (expect (projectile-git-changed-files root) :to-be nil)))))
+
+  (it "translates paths when the project sits below the repository root"
+    (projectile-test-with-sandbox
+     (projectile-test-with-files
+      ("repo/" "repo/outside.el" "repo/sub/" "repo/sub/.projectile" "repo/sub/inside.el")
+      (let* ((repo (file-truename (expand-file-name "repo/")))
+             (default-directory repo))
+        (projectile-changed-test--init)
+        (projectile-changed-test--git "add" "-A")
+        (projectile-changed-test--git "commit" "-qm" "init")
+        (write-region ";; x\n" nil (expand-file-name "outside.el" repo))
+        (write-region ";; x\n" nil (expand-file-name "sub/inside.el" repo))
+        (spy-on 'projectile-project-vcs :and-return-value 'git)
+        (let* ((root (expand-file-name "sub/" repo))
+               (files (projectile-git-changed-files root)))
+          ;; git reports repo-relative paths; they must come back
+          ;; project-relative, and the file outside the project dropped
+          (expect files :to-equal '("inside.el")))))))
+
+  (it "returns nothing for a project that isn't under git"
+    (spy-on 'projectile-project-vcs :and-return-value 'hg)
+    (expect (projectile-git-changed-files "/proj/") :to-be nil)))
+
+(describe "projectile-find-changed-file"
+  (it "refuses outside a git project"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-vcs :and-return-value 'hg)
+    (expect (projectile-find-changed-file) :to-throw 'user-error))
+
+  (it "says so when nothing has changed"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-vcs :and-return-value 'git)
+    (spy-on 'projectile-git-changed-files :and-return-value nil)
+    (expect (projectile-find-changed-file) :to-throw 'user-error))
+
+  (it "visits the file picked from the changed ones"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-vcs :and-return-value 'git)
+    (spy-on 'projectile-git-changed-files :and-return-value '("a.el" "b.el"))
+    (spy-on 'projectile-completing-read :and-return-value "b.el")
+    (spy-on 'find-file)
+    (projectile-find-changed-file)
+    (expect 'find-file :to-have-been-called-with "/proj/b.el"))
+
+  (it "asks for a revision with a prefix argument"
+    (spy-on 'projectile-acquire-root :and-return-value "/proj/")
+    (spy-on 'projectile-project-vcs :and-return-value 'git)
+    (spy-on 'projectile--read-git-ref :and-return-value "main")
+    (spy-on 'projectile-git-changed-files :and-return-value '("a.el"))
+    (spy-on 'projectile-completing-read :and-return-value "a.el")
+    (spy-on 'find-file)
+    (projectile-find-changed-file t)
+    (expect 'projectile-git-changed-files :to-have-been-called-with "/proj/" "main")))
+
+(describe "projectile-use-comint-mode-p"
+  (it "makes no command interactive when nil"
+    (let ((projectile-use-comint-mode nil))
+      (expect (projectile-use-comint-mode-p 'test) :to-be nil)
+      (expect (projectile-use-comint-mode-p 'compile) :to-be nil)))
+
+  (it "makes every command interactive when t"
+    (let ((projectile-use-comint-mode t))
+      (expect (projectile-use-comint-mode-p 'test) :to-be-truthy)
+      (expect (projectile-use-comint-mode-p 'run) :to-be-truthy)))
+
+  (it "makes only the listed commands interactive"
+    (let ((projectile-use-comint-mode '(test run)))
+      (expect (projectile-use-comint-mode-p 'test) :to-be-truthy)
+      (expect (projectile-use-comint-mode-p 'run) :to-be-truthy)
+      (expect (projectile-use-comint-mode-p 'compile) :to-be nil)))
+
+  (it "still honors the obsolete per-phase option"
+    (let ((projectile-use-comint-mode nil)
+          (projectile-test-use-comint-mode t))
+      (expect (projectile-use-comint-mode-p 'test) :to-be-truthy)
+      (expect (projectile-use-comint-mode-p 'compile) :to-be nil)))
+
+  (it "covers the named tasks too"
+    ;; Tasks run through the same machinery as the lifecycle phases, so
+    ;; `t' has to mean them as well (issue #2156).
+    (let ((projectile-use-comint-mode t))
+      (expect (projectile-use-comint-mode-p 'task) :to-be-truthy))
+    (let ((projectile-use-comint-mode '(task)))
+      (expect (projectile-use-comint-mode-p 'task) :to-be-truthy)
+      (expect (projectile-use-comint-mode-p 'compile) :to-be nil))
+    (let ((projectile-use-comint-mode '(compile)))
+      (expect (projectile-use-comint-mode-p 'task) :to-be nil))
+    (let ((projectile-use-comint-mode nil))
+      (expect (projectile-use-comint-mode-p 'task) :to-be nil))))
+
+;;; The commands themselves, not the machinery under them
+
+;; Every layer beneath these was covered and the commands were not, which is
+;; how two wiring bugs shipped in one month: `s-p F' completing over an empty
+;; list because it read a variable instead of its accessor, and
+;; find-file-in-subproject offering nothing in a Go workspace.  One spec each,
+;; asking only whether the command reaches its destination.
+
+(describe "projectile-find-file"
+  (it "opens the chosen file, resolved against the project root"
+    (projectile-test-with-project
+        (("src/a.txt" . "x") ("b.txt" . "y"))
+      (let ((root default-directory))
+        (spy-on 'projectile-completing-read :and-return-value "src/a.txt")
+        (spy-on 'find-file)
+        (projectile-find-file)
+        (expect 'find-file :to-have-been-called-with
+                (expand-file-name "src/a.txt" root)))))
+
+  (it "offers the project's files and runs the find-file hook"
+    (projectile-test-with-project
+        (("src/a.txt" . "x") ("b.txt" . "y"))
+      (let ((ran nil))
+        (spy-on 'projectile-completing-read :and-return-value "b.txt")
+        (spy-on 'find-file)
+        (let ((projectile-find-file-hook (list (lambda () (setq ran t)))))
+          (projectile-find-file))
+        (expect ran :to-be-truthy)
+        (let ((offered (cadr (spy-calls-args-for 'projectile-completing-read 0))))
+          (expect offered :to-contain "src/a.txt")
+          (expect offered :to-contain "b.txt")))))
+
+  (it "does nothing when the completion is declined"
+    (projectile-test-with-project
+        (("a.txt" . "x"))
+      (spy-on 'projectile-completing-read :and-return-value nil)
+      (spy-on 'find-file)
+      (projectile-find-file)
+      (expect 'find-file :not :to-have-been-called)))
+
+  (it "invalidates the cache first when given a prefix argument"
+    (projectile-test-with-project
+        (("a.txt" . "x"))
+      (spy-on 'projectile-completing-read :and-return-value "a.txt")
+      (spy-on 'find-file)
+      (spy-on 'projectile-invalidate-cache)
+      (let ((projectile-enable-caching t))
+        (projectile-find-file '(4)))
+      (expect 'projectile-invalidate-cache :to-have-been-called))))
+
+(describe "projectile-find-file-all"
+  (it "offers what the generic listing command returns, ignore rules and all"
+    (projectile-test-with-project
+        ((".projectile" . "-/vendor\n")
+         ("keep.txt" . "x")
+         ("vendor/hidden.txt" . "y"))
+      (let ((root default-directory))
+        (spy-on 'projectile-files-via-ext-command
+                :and-return-value '("keep.txt" "vendor/hidden.txt"))
+        (spy-on 'projectile-completing-read :and-return-value "vendor/hidden.txt")
+        (spy-on 'find-file)
+        (projectile-find-file-all)
+        ;; the ignored file is reachable - that is the point of the command
+        (expect (cadr (spy-calls-args-for 'projectile-completing-read 0))
+                :to-contain "vendor/hidden.txt")
+        (expect 'find-file :to-have-been-called-with
+                (expand-file-name "vendor/hidden.txt" root))))))
+
+(describe "projectile-switch-open-project"
+  (it "offers the open projects and switches to the chosen one"
+    (spy-on 'projectile-relevant-open-projects :and-return-value '("/a/" "/b/"))
+    (spy-on 'projectile-switch-project-by-name)
+    (spy-on 'projectile-completing-read :and-call-fake
+            (lambda (_prompt _choices &rest args)
+              (funcall (plist-get args :action) "/b/")))
+    (projectile-switch-open-project)
+    (expect 'projectile-switch-project-by-name
+            :to-have-been-called-with "/b/" nil))
+
+  (it "says so when nothing is open"
+    (spy-on 'projectile-relevant-open-projects :and-return-value nil)
+    (expect (projectile-switch-open-project) :to-throw 'user-error)))
+
+(describe "projectile-find-dir"
+  (it "opens the chosen directory in dired, resolved against the root"
+    (projectile-test-with-project
+        (("src/nested/a.txt" . "x"))
+      (let ((root default-directory))
+        (spy-on 'projectile-completing-read :and-return-value "src/")
+        (spy-on 'dired)
+        (projectile-find-dir)
+        (expect 'dired :to-have-been-called-with
+                (expand-file-name "src/" root))))))
+
+(describe "projectile-find-file-dwim"
+  (it "opens the single file the name at point resolves to, without prompting"
+    (projectile-test-with-project
+        (("src/unique-name.txt" . "x") ("other.txt" . "y"))
+      (let ((root default-directory))
+        (spy-on 'projectile-select-files :and-return-value '("src/unique-name.txt"))
+        (spy-on 'find-file)
+        (spy-on 'projectile-completing-read)
+        (projectile-find-file-dwim)
+        (expect 'find-file :to-have-been-called-with
+                (expand-file-name "src/unique-name.txt" root))
+        ;; one candidate means no completion is needed
+        (expect 'projectile-completing-read :not :to-have-been-called))))
+
+  (it "prompts when the name at point matches more than one file"
+    (projectile-test-with-project
+        (("a-one.txt" . "x") ("a-two.txt" . "y"))
+      (spy-on 'projectile-select-files :and-return-value '("a-one.txt" "a-two.txt"))
+      (spy-on 'projectile-completing-read :and-return-value "a-two.txt")
+      (spy-on 'find-file)
+      (projectile-find-file-dwim)
+      (expect 'projectile-completing-read :to-have-been-called))))
+
+(describe "projectile-recentf"
+  (it "opens a recent file of the project, resolved against the root"
+    (projectile-test-with-project
+        (("a.txt" . "x"))
+      ;; the command gates on `(boundp 'recentf-list)', and a `let' cannot
+      ;; make an unbound, non-special symbol bound - load recentf instead
+      (require 'recentf)
+      (let ((root default-directory))
+        (spy-on 'projectile-recentf-files :and-return-value '("a.txt"))
+        (spy-on 'projectile-completing-read :and-return-value "a.txt")
+        (spy-on 'find-file)
+        (projectile-recentf)
+        (expect 'find-file :to-have-been-called-with
+                (expand-file-name "a.txt" root)))))
+
+  (it "says so when recentf is not enabled"
+    (projectile-test-with-project
+        (("a.txt" . "x"))
+      (spy-on 'message)
+      (spy-on 'find-file)
+      ;; `recentf-list' being unbound is how the command detects it
+      (cl-letf (((symbol-function 'boundp)
+                 (lambda (sym) (not (eq sym 'recentf-list)))))
+        (projectile-recentf))
+      (expect 'find-file :not :to-have-been-called)
+      (expect (car (spy-calls-args-for 'message 0)) :to-match "recentf"))))
+
+(describe "projectile-version"
+  (it "returns a version string"
+    (expect (projectile-version) :to-be-truthy)
+    (expect (stringp (projectile-version)) :to-be-truthy)))
+
+(describe "projectile-run-command-in-root"
+  (it "runs the next command from the project root"
+    (projectile-test-with-project
+        (("a.txt" . "x"))
+      (let ((root default-directory)
+            (seen nil))
+        (spy-on 'execute-extended-command :and-call-fake
+                (lambda (&rest _) (setq seen default-directory)))
+        (cl-letf (((symbol-function 'call-interactively)
+                   (lambda (cmd &rest _) (funcall cmd))))
+          (projectile-run-command-in-root))
+        (expect (file-truename seen) :to-equal (file-truename root))))))
+
+(describe "projectile-edit-dir-locals"
+  (it "opens the project's .dir-locals.el"
+    (projectile-test-with-project
+        ((".dir-locals.el" . "((nil . ((a . 1))))\n"))
+      (let ((root default-directory))
+        (spy-on 'find-file)
+        (projectile-edit-dir-locals)
+        (expect 'find-file :to-have-been-called-with
+                (expand-file-name ".dir-locals.el" root))))))
+
+;;; projectile-commands-test.el ends here

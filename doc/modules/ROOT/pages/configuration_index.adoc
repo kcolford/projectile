@@ -1,0 +1,486 @@
+= Configuration variable index
+
+An alphabetical reference of Projectile's user-facing configuration variables,
+with a one-line summary of each. For full details and to change a variable, use
+kbd:[C-h v] (`describe-variable`) or `M-x customize-group RET projectile`. The
+variables are documented in context throughout xref:configuration.adoc[Configuration],
+xref:indexing.adoc[Indexing & performance], xref:sessions.adoc[Per-project sessions]
+and the other reference pages.
+
+[cols="2,3", options="header"]
+|===
+| Variable | Purpose
+
+| `projectile-after-switch-project-hook`
+| Hooks run right after project is switched.
+
+| `projectile-alien-honors-ignores`
+| Whether ‘alien’ indexing applies Projectile’s own ignore rules.
+
+| `projectile-async-index-sentinel-timeout`
+| Seconds to wait for a finished index’s result before collecting it.
+
+| `projectile-async-indexing`
+| Whether to index projects without freezing Emacs.
+
+| `projectile-auto-cleanup-known-projects`
+| Whether to cleanup projects when project switching commands are invoked.
+
+| `projectile-auto-discover-projects`
+| Whether to discover projects under ‘projectile-project-search-path’.
+
+| `projectile-auto-track-known-projects`
+| Whether visiting a file in a project adds it to the known projects.
+
+| `projectile-auto-update-cache`
+| Whether cache is automatically updated when files are opened or deleted.
+
+| `projectile-auto-update-cache-with-watches`
+| Whether to watch project directories to keep the files cache fresh.
+
+| `projectile-before-switch-project-hook`
+| Hooks run right before project is switched.
+
+| `projectile-bookmark-scope`
+| How a bookmark is recognised as belonging to a project.
+
+| `projectile-buffers-filter-function`
+| A function used to filter the buffers in ‘projectile-project-buffers’.
+
+| `projectile-bzr-command`
+| Command used by projectile to get the files in a bazaar project.
+
+| `projectile-bzr-ignored-command`
+| Command used by projectile to get the ignored files in a bazaar project.
+
+| `projectile-cache-file`
+| The name of Projectile’s cache.
+
+| `projectile-command-history-ignore-duplicates`
+| Controls when inputs are added to projectile’s command history.
+
+| `projectile-command-history-scope`
+| How widely a project’s command history is shared.
+
+| `projectile-compilation-buffer-scope`
+| What a lifecycle command’s compilation buffer is named after.
+
+| `projectile-completion-system`
+| The completion system to be used by Projectile.
+
+| `projectile-create-missing-test-files`
+| Whether toggling to a test file that does not exist yet creates it.
+
+| `projectile-current-project-on-switch`
+| Determines whether to display current project when switching projects.
+
+| `projectile-darcs-command`
+| Command used by projectile to get the files in a darcs project.
+
+| `projectile-dashboard-link-files`
+| Base names the dashboard offers as links when the project has them.
+
+| `projectile-dashboard-max-recent-files`
+| How many recently visited files ‘projectile-dashboard’ lists.
+
+| `projectile-dashboard-sections`
+| The sections ‘projectile-dashboard’ renders, in order.
+
+| `projectile-default-src-directory`
+| The default value of a project’s src-dir property.
+
+| `projectile-default-test-directory`
+| The default value of a project’s test-dir property.
+
+| `projectile-dirconfig-comment-prefix`
+| ‘projectile-dirconfig-file‘ comment start marker.
+
+| `projectile-dirconfig-file`
+| The file which serves both as a project marker and configuration file.
+
+| `projectile-discover-tasks`
+| Whether to offer the tasks a project’s own tooling defines.
+
+| `projectile-dynamic-mode-line`
+| Whether to update the mode-line dynamically.
+
+| `projectile-enable-caching`
+| When t enables project files caching.
+
+| `projectile-enable-cmake-presets`
+| Whether CMake projects use presets for their lifecycle commands.
+
+| `projectile-enable-frecency`
+| Whether to rank project files by frecency in completion.
+
+| `projectile-fd-executable`
+| Path or name of fd executable used by Projectile if enabled.
+
+| `projectile-file-exists-local-cache-expire`
+| Number of seconds before the local file existence cache expires.
+
+| `projectile-file-exists-remote-cache-expire`
+| Number of seconds before the remote file existence cache expires.
+
+| `projectile-files-cache-expire`
+| Number of seconds before project files list cache expires.
+
+| `projectile-find-dir-hook`
+| Hooks run when a directory is opened with ‘projectile-find-dir’.
+
+| `projectile-find-dir-includes-top-level`
+| Whether ‘projectile-find-dir’ also offers the top-level directory.
+
+| `projectile-find-file-hook`
+| Hooks run when a file is opened with ‘projectile-find-file’.
+
+| `projectile-fossil-command`
+| Command used by projectile to get the files in a fossil project.
+
+| `projectile-frecency-file`
+| File where Projectile persists the per-project file visit history.
+
+| `projectile-frecency-max-files`
+| Maximum number of files tracked per project.
+
+| `projectile-frecency-max-projects`
+| Maximum number of projects whose frecency history is kept.
+
+| `projectile-generic-command`
+| Command used by projectile to get the files in a generic project.
+
+| `projectile-git-command`
+| Command used by projectile to get the files in a git project.
+
+| `projectile-git-fd-args`
+| Arguments to fd used to re-implement ‘git ls-files’.
+
+| `projectile-git-ignored-command`
+| Command used by projectile to get the ignored files in a git project.
+
+| `projectile-git-submodule-command`
+| Command used by projectile to list submodules of a given git repository.
+
+| `projectile-git-use-fd`
+| Whether to list a git project’s files with fd instead of git ls-files.
+
+| `projectile-globally-ignored-buffers`
+| A list of regular expressions for buffer names ignored by projectile.
+
+| `projectile-globally-ignored-directories`
+| A list of directories globally ignored by projectile.
+
+| `projectile-globally-ignored-file-regexps`
+| A list of regexps matching files ignored by Projectile.
+
+| `projectile-globally-ignored-file-suffixes`
+| A list of file suffixes globally ignored by projectile.
+
+| `projectile-globally-ignored-files`
+| A list of files globally ignored by projectile.
+
+| `projectile-globally-ignored-modes`
+| A list of regular expressions for major modes ignored by projectile.
+
+| `projectile-globally-unignored-directories`
+| A list of directories globally unignored by projectile.
+
+| `projectile-globally-unignored-files`
+| A list of files globally unignored by projectile.
+
+| `projectile-grep-finished-hook`
+| Hooks run when ‘projectile-grep’ finishes.
+
+| `projectile-hg-command`
+| Command used by projectile to get the files in a hg project.
+
+| `projectile-hg-ignored-command`
+| Command used by projectile to get the ignored files in a hg project.
+
+| `projectile-ignored-project-function`
+| Function to decide if a project is added to ‘projectile-known-projects’.
+
+| `projectile-ignored-project-regexps`
+| Regexps matching projects not to be added to ‘projectile-known-projects’.
+
+| `projectile-ignored-projects`
+| A list of projects not to be added to ‘projectile-known-projects’.
+
+| `projectile-indexing-method`
+| Specifies the indexing method used by Projectile.
+
+| `projectile-jj-command`
+| Command used by projectile to get the files in a Jujutsu project.
+
+| `projectile-keymap-prefix`
+| The key sequence ‘projectile-command-map’ is bound to, if any.
+
+| `projectile-kill-buffers-filter`
+| Determine which buffers are killed by ‘projectile-kill-buffers’.
+
+| `projectile-known-projects-file`
+| Name and location of the Projectile’s known projects file.
+
+| `projectile-max-file-buffer-count`
+| Maximum number of file buffers per project that are kept open.
+
+| `projectile-mode`
+| Non-nil if Projectile mode is enabled.
+
+| `projectile-mode-hook`
+| Hook run after entering or leaving ‘projectile-mode’.
+
+| `projectile-mode-line-function`
+| The function to use to generate project-specific mode-line.
+
+| `projectile-mode-line-prefix`
+| Mode line lighter prefix for Projectile.
+
+| `projectile-other-file-alist`
+| Alist of extensions to try when switching to a file’s counterpart.
+
+| `projectile-pijul-command`
+| Command used by projectile to get the files in a pijul project.
+
+| `projectile-project-changed-functions`
+| Functions to run when the current project changes.
+
+| `projectile-project-groups`
+| Named groups of projects that belong together.
+
+| `projectile-project-name`
+| If this value is non-nil, it will be used as project name.
+
+| `projectile-project-name-function`
+| A function that receives the project-root and returns the project name.
+
+| `projectile-project-root-files`
+| A list of files considered to mark the root of a project.
+
+| `projectile-project-root-files-bottom-up`
+| A list of files considered to mark the root of a project.
+
+| `projectile-project-root-files-top-down-recurring`
+| A list of files considered to mark the root of a project.
+
+| `projectile-project-root-functions`
+| A list of functions for finding project root folders.
+
+| `projectile-project-search-path`
+| List of folders where projectile is automatically going to look for projects.
+
+| `projectile-related-files-function`
+| Function to find related files based on PROJECT-TYPE.
+
+| `projectile-require-project-root`
+| Require the presence of a project root to operate when true.
+
+| `projectile-sapling-command`
+| Command used by projectile to get the files in a Sapling project.
+
+| `projectile-sapling-ignored-command`
+| Command used by projectile to get the ignored files in a Sapling project.
+
+| `projectile-search-async`
+| Whether the reviewable search/replace commands scan asynchronously.
+
+| `projectile-search-backend`
+| The backend ‘projectile-search’ uses to search the project.
+
+| `projectile-search-max-matches`
+| Upper bound on how many matches a review buffer collects.
+
+| `projectile-search-render-interval`
+| Seconds to leave between redraws while search results stream in.
+
+| `projectile-search-scan-chunk-size`
+| Number of candidate files scanned per async chunk before yielding.
+
+| `projectile-search-use-ripgrep`
+| Whether ‘projectile-search-review’ accelerates literal search with ripgrep.
+
+| `projectile-search-whole-word`
+| Whether the reviewable search/replace start in whole-word mode.
+
+| `projectile-session-auto-save`
+| Whether ‘projectile-session-mode’ saves sessions automatically.
+
+| `projectile-session-buffer-serializers`
+| How buffers are turned into readable records and back.
+
+| `projectile-session-default-action`
+| Action used to populate a project’s freshly created tab.
+
+| `projectile-session-directory`
+| Directory under which per-project session files are stored.
+
+| `projectile-session-mode`
+| Non-nil if Projectile-Session mode is enabled.
+
+| `projectile-session-mode-hook`
+| Hook run after entering or leaving ‘projectile-session-mode’.
+
+| `projectile-session-restore-on-startup`
+| Whether to reopen every saved project session when Emacs starts.
+
+| `projectile-session-restore-on-switch`
+| Whether switching to a project restores its saved session.
+
+| `projectile-session-tab-name-function`
+| Function computing the tab name for a project.
+
+| `projectile-shell-backend`
+| The backend ‘projectile-run’ uses to open a shell/REPL/terminal.
+
+| `projectile-show-menu`
+| Whether to display Projectile’s menu.
+
+| `projectile-sibling-max-group-share`
+| How much of the known projects an inferred sibling group may cover.
+
+| `projectile-sibling-project-functions`
+| Functions consulted to find the projects related to one another.
+
+| `projectile-sort-order`
+| The sort order used for a project’s files.
+
+| `projectile-subproject-functions`
+| Functions consulted by ‘projectile-project-subprojects’.
+
+| `projectile-subproject-markers`
+| File names that mark a subproject inside a project.
+
+| `projectile-svn-command`
+| Command used by projectile to get the files in a svn project.
+
+| `projectile-svn-ignored-command`
+| Command used by projectile to get the ignored files in a svn project.
+
+| `projectile-switch-project-action`
+| Action invoked after switching projects with ‘projectile-switch-project’.
+
+| `projectile-switch-project-other-frame-action`
+| Action run by ‘projectile-switch-project-other-frame’ after switching.
+
+| `projectile-switch-project-other-window-action`
+| Action run by ‘projectile-switch-project-other-window’ after switching.
+
+| `projectile-task-providers`
+| Functions that discover the tasks a project’s tooling defines.
+
+| `projectile-tasks`
+| An alist of named tasks that can be run with ‘projectile-run-task’.
+
+| `projectile-test-at-point-rules`
+| Rules telling ‘projectile-run-test-at-point’ how to run a single test.
+
+| `projectile-test-prefix-function`
+| Function to find test files prefix based on PROJECT-TYPE.
+
+| `projectile-test-suffix-function`
+| Function to find test files suffix based on PROJECT-TYPE.
+
+| `projectile-todo-keywords`
+| Annotation keywords ‘projectile-todos’ collects across the project.
+
+| `projectile-use-comint-mode`
+| Which of the commands Projectile runs get an interactive output buffer.
+
+| `projectile-use-git-grep`
+| Whether ‘projectile-grep’ delegates to ‘vc-git-grep’ in git projects.
+
+| `projectile-vcs-markers`
+| Alist of (MARKER . VCS) pairs probed by ‘projectile-project-vcs’.
+
+| `projectile-verbose`
+| Echo messages that are not errors.
+
+| `projectile-warn-on-prefixless-dirconfig-lines`
+| Whether to warn about deprecated prefix-less ignore entries.
+
+| `projectile-watch-max-directories`
+| Maximum number of file-notify watches to register per project.
+
+| `projectile-worktree-functions`
+| Functions consulted to find the other checkouts of a project.
+
+|===
+
+== Former names
+
+Options renamed or folded since 3.4 keep working under their old names, and
+the byte-compiler points at the replacement. The old names go away in
+Projectile 4.0. This is where each one leads now.
+
+[cols="3,3,1", options="header"]
+|===
+| Former name | Current name | Since
+
+| `projectile-auto-discover`
+| `projectile-auto-discover-projects`
+| 3.4
+
+| `projectile-global-ignore-file-patterns`
+| `projectile-globally-ignored-file-regexps`
+| 3.4
+
+| `projectile-related-files-fn-function`
+| `projectile-related-files-function`
+| 3.4
+
+| `projectile-cmd-hist-ignoredups`
+| `projectile-command-history-ignore-duplicates`
+| 3.4
+
+| `projectile-replace-max-matches`
+| `projectile-search-max-matches`
+| 3.4
+
+| `projectile-replace-async`
+| `projectile-search-async`
+| 3.4
+
+| `projectile-replace-scan-chunk-size`
+| `projectile-search-scan-chunk-size`
+| 3.4
+
+| `projectile-configure-use-comint-mode`, `projectile-compile-use-comint-mode`,
+  `projectile-test-use-comint-mode`, `projectile-install-use-comint-mode`,
+  `projectile-package-use-comint-mode`, `projectile-run-use-comint-mode`
+| `projectile-use-comint-mode`, which takes a list of the commands to make
+  interactive
+| 3.4
+
+| `projectile-per-project-compilation-buffer`,
+  `projectile-per-command-compilation-buffer`
+| `projectile-compilation-buffer-scope`, a list of `project` and/or `command`
+| 3.4
+
+| `projectile-tags-file-name`
+| None. List the tags file in `projectile-globally-ignored-files`.
+| 3.4
+
+| `projectile-go-project-test-function`
+| None. Re-register the `go` project type with your own predicate.
+| 3.4
+
+| `projectile-track-known-projects-automatically`
+| `projectile-auto-track-known-projects`
+| 3.5
+
+| `projectile-ignored-project-patterns`
+| `projectile-ignored-project-regexps`
+| 3.5
+
+| `projectile-watch-directory-limit`
+| `projectile-watch-max-directories`
+| 3.5
+
+| `projectile-dashboard-recent-files`
+| `projectile-dashboard-max-recent-files`
+| 3.5
+
+| `projectile-session-autosave`
+| `projectile-session-auto-save`
+| 3.5
+|===

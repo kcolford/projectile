@@ -1,0 +1,297 @@
+= Ignoring files
+
+
+Projectile can exclude files and directories from a project in several ways,
+described below. Which of them apply depends on the indexing method in use - see
+the xref:indexing.adoc#indexing-method-comparison[indexing method
+comparison] for the full matrix of what each method honors.
+
+== Ignoring files using `.projectile` (a.k.a. dirconfig)
+
+NOTE: All three indexing methods honor the `-` ignore and `!` unignore entries
+below.  Under `alien` the ignore entries are handed to the external indexing
+tool as exclusion arguments (see xref:indexing.adoc#alien-ignores[Indexing]).
+The `+` keep entries apply everywhere too: under `alien` they are passed to the
+indexing tool as path arguments, or applied to its output for the few tools that
+can't take them.
+
+If you'd like to instruct Projectile to ignore certain files in a
+project, when indexing it you can do so in the `.projectile` file by
+adding one pattern per line, each preceded with a `-` sign. The
+patterns follow gitignore rules and are matched against paths relative
+to the project root - a leading slash anchors a pattern there.
+
+NOTE: Lines without any prefix at all are still accepted and treated
+as ignore patterns for backward compatibility, but the implicit form
+is being phased out and Projectile now warns about it once per
+project.  Prefer the explicit `-` prefix in new dirconfigs.
+
+Here's an example for a typical Rails application:
+
+----
+-/log
+-/tmp
+-/vendor
+-/public/uploads
+----
+
+This would ignore those folders only at the root of the project.
+Patterns without a slash match at any depth instead:
+
+----
+-tmp
+-*.rb
+-*.yml
+-models
+----
+
+You can also ignore everything except certain subdirectories. This is
+useful when selecting the directories to keep is easier than selecting
+the directories to ignore, although you can do both. To select
+directories to keep, that means everything else will be ignored.
+
+Example:
+
+----
++/src/foo
++/tests/foo
+----
+
+Keep in mind that you can only include subdirectories, not file
+patterns.
+
+If both directories to keep and ignore are specified, the directories
+to keep first apply, restricting what files are considered. The paths
+and patterns to ignore are then applied to that set.
+
+Finally, you can override ignored files. This is especially useful
+when some files ignored by your VCS should be considered as part of
+your project by projectile:
+
+----
+!/src/foo
+!*.yml
+----
+
+When a path is overridden, its contents are still subject to ignore
+patterns. To override those files as well, specify their full path
+with a bang prefix.
+
+[#pattern-language]
+=== The pattern language
+
+Both ignore examples above are the same thing: gitignore patterns,
+matched against every file's root-relative path. There's one pattern
+language and one matcher, shared by every indexing method and by the
+global ignore variables described below.
+
+* A pattern without a slash matches the file name or any directory
+  segment at any depth: `-log` ignores a file or directory called
+  `log` anywhere in the tree, but won't match `xlog` or `log.txt`.
+* A pattern containing a slash is anchored at the project root, and a
+  leading slash anchors without naming a directory of its own:
+  `-src/gen` and `-/log` ignore only `src/gen` and `log` at the root,
+  not `lib/src/gen` or `src/log`. Prefix the pattern with `**/` to
+  match at any depth.
+* A trailing slash restricts the pattern to directories: `-vendor/`
+  ignores `vendor` directories, but not files named `vendor`.
+* A matched directory covers its entire subtree.
+* `*` matches within a single path segment, while `**` also crosses
+  `/`; `?` matches a single character, and `[...]`/`[!...]`
+  character classes are supported.
+* Matching is case-sensitive.
+
+The search commands (`projectile-grep`, `projectile-ag`,
+`projectile-ripgrep`, `projectile-find-references`) apply the very same
+patterns, translated into whatever exclusion syntax the underlying tool
+speaks, so a search sees the same set of files indexing does. The one
+place the translation can't be exact is `grep`: `*` in a `find` path
+glob crosses `/`, so a root-anchored pattern like `-/*.txt` also
+excludes deeper matches there.
+
+[#worked-examples]
+=== Worked examples
+
+The rules compose, and the composition is where people trip up. All three
+examples below are real: the file lists are what Projectile actually returns.
+
+==== A monorepo: keep two packages, drop build output
+
+Given this tree:
+
+----
+packages/core/src/a.ts
+packages/core/dist/a.js
+packages/web/src/b.ts
+packages/web/node_modules/dep/i.js
+packages/legacy/src/c.ts
+node_modules/top/x.js
+----
+
+and this `.projectile`:
+
+----
++/packages/core
++/packages/web
+-dist/
+-node_modules/
+----
+
+you get:
+
+----
+packages/core/src/a.ts
+packages/web/src/b.ts
+----
+
+The `+` entries run first and restrict the project to those two directories, so
+`packages/legacy` never enters the picture. The `-` entries then apply to what's
+left, and because neither has a slash they match at any depth: one `-dist/`
+handles every package's build output, and one `-node_modules/` catches both the
+top-level and the nested one.
+
+NOTE: Under `alien` the kept directories are handed to the indexing tool as
+path arguments (`git ls-files -- src tests`, `fd --search-path`), so the
+restriction costs nothing extra. Tools whose command is a shell pipeline can't
+take path arguments, so there the listing is filtered inside Emacs instead.
+
+==== Rescuing a file the ignore rules would drop
+
+Given `app/main.rb`, `config/app.yml`, `log/dev.log`, `tmp/cache/x`,
+`vendor/assets/lib.min.js` and `vendor/assets/custom.min.js`, plus:
+
+----
+-/log/
+-/tmp/
+-*.min.js
+!/vendor/assets/custom.min.js
+----
+
+you get:
+
+----
+app/main.rb
+config/app.yml
+vendor/assets/custom.min.js
+----
+
+`-*.min.js` drops every minified file, and the `!` entry pulls one specific file
+back. This works under all three indexing methods, though a project with `!`
+entries gives up `alien`'s push-down and is filtered inside Emacs instead - an
+exclusion handed to `git` or `fd` can't be taken back afterwards.
+
+==== Anchored and floating, side by side
+
+The single most common surprise is forgetting that a slash changes the meaning.
+Given `log/a.txt`, `src/log/b.txt`, `build/d.o`, `src/build/c.o` and `keep.txt`:
+
+----
+-/log/
+-build/
+----
+
+leaves:
+
+----
+keep.txt
+src/log/b.txt
+----
+
+`-/log/` is anchored, so it only removes the `log` directory at the project
+root and `src/log` survives. `-build/` has no leading slash, so it removes
+`build` directories at every depth. Write `-log/` if you meant both.
+
+=== Comments
+
+If you would like to include comment lines in your .projectile file,
+you can customize the variable `projectile-dirconfig-comment-prefix`.
+Assigning it a non-nil character value, e.g. `#`, will cause lines in
+the `.projectile` file whose first non-whitespace character matches
+that character to be treated as comments instead of patterns.
+
+The same is true of the `+`, `-`, and `!` prefixes: leading spaces
+and tabs before the prefix are skipped, so accidental indentation
+won't silently turn the entry into a literal ignore pattern.
+
+== Ignored files using the project indexing tools
+
+If you're using the `hybrid` or `alien` indexing strategies, the simplest
+way to ignore some files is just leverage the configuration of the
+tool you're using to do the project indexing.
+
+E.g. in the case of `git` you can just tweak `.gitignore`.
+
+Sometimes, however, you'd like to have some files as part of your project,
+but you don't want to see them in Projectile for whatever reasons.
+
+In those cases the project dirconfig file (`.projectile`) can be a handy
+way to further adjust what you want to see in Projectile.
+
+== Global ignore and unignore settings
+
+In addition to per-project ignores, Projectile provides several variables for
+globally ignoring files and directories.  Except for
+`projectile-globally-ignored-file-regexps` (see below) their entries are the
+gitignore patterns described xref:pattern-language[above], and they take effect
+with every indexing method; under `alien` they are pushed down into the external
+indexing tool.
+
+Out of the box `projectile-globally-ignored-directories` covers the editor and
+version control directories plus the dependency and build output directories of
+the common ecosystems - `node_modules`, `target`, `__pycache__`, `.venv`,
+`.next`, `.terraform` and so on. Under `alien` your VCS is usually ignoring
+those anyway; the defaults matter for `native` and `hybrid` indexing, and for
+projects that aren't under version control at all.
+
+Directories that projects do sometimes commit - `vendor`, `dist`, `public`,
+`build` - are deliberately left out. If one of the defaults gets in your way,
+add it to `projectile-globally-unignored-directories`, or put a `!` line in
+that project's `.projectile` to get it back for that project alone.
+
+[source,elisp]
+----
+;; Ignore files by name, at any depth
+(setq projectile-globally-ignored-files '("TAGS" "GPATH"))
+
+;; Ignore files by suffix (e.g. compiled artifacts)
+(setq projectile-globally-ignored-file-suffixes '(".o" ".pyc" ".elc"))
+
+;; Ignore directories - the entries are patterns, so `*' is a wildcard
+(setq projectile-globally-ignored-directories
+      '("node_modules"  ; any directory named node_modules, at any depth
+        "/tmp"          ; only ./tmp, at the project root
+        "*.egg-info"))  ; any directory whose name ends in .egg-info
+----
+
+`projectile-globally-ignored-file-regexps` is the odd one out: its entries are
+Emacs regexps, matched against absolute file names, not patterns. They can't be
+handed to an external tool or expressed as a glob, so they only apply under
+`native` indexing.
+
+[source,elisp]
+----
+;; Ignore files matching regexp patterns (native indexing only)
+(setq projectile-globally-ignored-file-regexps '("\\.min\\.js$" "\\.map$"))
+----
+
+NOTE: Before Projectile 3.3 a leading `*` in
+`projectile-globally-ignored-directories` was a marker meaning "at any depth"
+rather than a wildcard, and a bare entry was matched at the top level only
+(under `hybrid`) or by directory name at any depth (under `native`). Now every
+entry is a plain gitignore pattern, matched identically by every indexing
+method: drop the `*` prefix from entries like `*node_modules`, and write `/tmp`
+if you really mean only the one at the project root.
+
+You can also _unignore_ specific files or directories that would otherwise be
+excluded.  This is useful when your VCS ignores files that you still want
+Projectile to show:
+
+[source,elisp]
+----
+;; Unignore specific files
+(setq projectile-globally-unignored-files '("important.dat"))
+
+;; Unignore specific directories
+(setq projectile-globally-unignored-directories '("vendor"))
+----
+
